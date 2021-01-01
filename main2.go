@@ -74,6 +74,24 @@ func main() {
 	dg.Close()
 }
 
+func voiceState(s *discordgo.Session, m *discordgo.MessageCreate) (*discordgo.VoiceState, error) {
+	c, err := s.State.Channel(m.ChannelID)
+	if err != nil {
+		return nil, fmt.Errorf("error find the channel that the message post to: %w", err)
+	}
+
+	g, err := s.State.Guild(c.GuildID)
+	if err != nil {
+		return nil, fmt.Errorf("error find guild that the message post to: %s", err)
+	}
+	for _, vs := range g.VoiceStates {
+		if vs.UserID == m.Author.ID {
+			return vs, nil
+		}
+	}
+	return nil, nil
+}
+
 // This function will be called (due to AddHandler above) every time a new
 // message is created on any channel that the autenticated bot has access to.
 func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
@@ -112,29 +130,17 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		log.Printf("ogg data created %d bytes", len(resp.AudioContent))
 		oggData := makeBuffer(resp.AudioContent)
 
-		// Find the channel that the message came from.
-		c, err := s.State.Channel(m.ChannelID)
+		vs, err := voiceState(s, m)
 		if err != nil {
-			// Could not find channel.
+			panic(err)
+		}
+		if vs == nil {
+			log.Printf("member %s is not joining any voice channel", m.Author.ID)
 			return
 		}
 
-		// Find the guild for that channel.
-		g, err := s.State.Guild(c.GuildID)
-		if err != nil {
-			// Could not find guild.
-			return
-		}
-
-		// Look for the message sender in that guild's current voice states.
-		for _, vs := range g.VoiceStates {
-			if vs.UserID == m.Author.ID {
-				err = playSound(s, g.ID, vs.ChannelID, oggData)
-				if err != nil {
-					fmt.Println("Error playing sound:", err)
-				}
-				return
-			}
+		if err := playSound(s, vs.GuildID, vs.ChannelID, oggData); err != nil {
+			panic(err)
 		}
 	}
 }
