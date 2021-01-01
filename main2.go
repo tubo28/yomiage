@@ -18,12 +18,13 @@ import (
 	tts_pb "google.golang.org/genproto/googleapis/cloud/texttospeech/v1"
 )
 
-var (
-	client *tts.Client
-)
-
 const (
 	discordToken string = "Nzk0NDkzODg2ODI2ODA3MzI2.X-7oFw.Z2HjIydKzkCJ9B6PpsC-xxj-1RE"
+)
+
+var (
+	client *tts.Client
+	dg     *discordgo.Session
 )
 
 func main() {
@@ -38,7 +39,7 @@ func main() {
 	}
 
 	// Create a new Discord session using the provided bot token.
-	dg, err := discordgo.New("Bot " + discordToken)
+	dg, err = discordgo.New("Bot " + discordToken)
 	if err != nil {
 		fmt.Println("Error creating Discord session: ", err)
 		return
@@ -55,8 +56,7 @@ func main() {
 	dg.Identify.Intents = discordgo.MakeIntent(discordgo.IntentsGuilds | discordgo.IntentsGuildMessages | discordgo.IntentsGuildVoiceStates)
 
 	// Open the websocket and begin listening.
-	err = dg.Open()
-	if err != nil {
+	if err := dg.Open(); err != nil {
 		fmt.Println("Error opening Discord session: ", err)
 	}
 
@@ -70,8 +70,6 @@ func main() {
 	dg.Close()
 }
 
-// This function will be called (due to AddHandler above) every time a new
-// message is created on any channel that the autenticated bot has access to.
 func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 	// Ignore all messages created by the bot itself
@@ -79,24 +77,66 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if m.Author.ID == s.State.User.ID {
 		return
 	}
+	botID := m.Author.ID
+	guildID := m.GuildID
 
-	if strings.HasPrefix(m.Content, "!ping") {
-		vs, err := voiceState(s, m.Author.ID, m.GuildID)
+	if strings.HasPrefix(m.Content, "!hi") {
+		userVs, err := voiceState(s, botID, guildID)
 		if err != nil {
-			log.Printf("failed to get VoiceState of guild %s: %s", m.GuildID, err.Error())
+			log.Printf("failed to get VoiceState of guild %s: %s", guildID, err.Error())
 			return
 		}
-		if vs == nil {
-			log.Printf("member %s is not joining any voice channel", m.Author.ID)
+		if userVs == nil {
+			log.Printf("member %s is not joining any voice channel", botID)
 			return
 		}
 
-		oggBuf, err := ttsOGGGoogle("pong!")
+		if conn, ok := dg.VoiceConnections[m.GuildID]; ok {
+			// todo: force move here?
+			log.Printf("bot %s is already joining voice channel %s guild %s", botID, conn.ChannelID, conn.GuildID)
+			if conn.ChannelID == userVs.ChannelID {
+				s.ChannelMessageSend(m.ChannelID, "already here")
+			} else {
+				s.ChannelMessageSend(m.ChannelID, "bot is already working on other channel")
+			}
+			return
+		}
+
+		if _, err := s.ChannelVoiceJoin(guildID, userVs.ChannelID, false, true); err != nil {
+			log.Printf("failed to join channel %s on guild %s", userVs.ChannelID, userVs.GuildID)
+			return
+		}
+
+		// todo: install errcheck
+		if _, err := s.ChannelMessageSend(m.ChannelID, "I read text here"); err != nil {
+			log.Printf("failed to send message to channel %s", m.ChannelID)
+		}
+	} else if strings.HasPrefix(m.Content, "!bye") {
+		conn, ok := dg.VoiceConnections[m.GuildID]
+		if !ok {
+			log.Print("not joining your voice channel")
+			s.ChannelMessageSend(m.ChannelID, "not joining your voice channel")
+			return
+		}
+		if err := conn.Disconnect(); err != nil {
+			log.Printf("error disconnect from voice channel %s", conn.ChannelID)
+			return
+		}
+		s.ChannelMessageSend(m.ChannelID, "Bye")
+	} else {
+		if strings.HasPrefix(m.Content, "!") {
+			return
+		}
+		conn, ok := dg.VoiceConnections[m.GuildID]
+		if !ok {
+			return
+		}
+		oggBuf, err := ttsOGGGoogle(m.Content, "ja-JP")
 		if err != nil {
 			log.Printf("failed to create tts audio: %s", err.Error())
 			return
 		}
-		if err := playOGG(s, vs.GuildID, vs.ChannelID, oggBuf); err != nil {
+		if err := playOGG(conn, oggBuf); err != nil {
 			log.Printf("failed to play ogg: %s", err.Error())
 		}
 	}
@@ -115,7 +155,9 @@ func voiceState(s *discordgo.Session, userID, guildID string) (*discordgo.VoiceS
 	return nil, nil
 }
 
-func ttsOGGGoogle(s string) ([][]byte, error) {
+// lang: https://cloud.google.com/text-to-speech/docs/voices
+// todo: randomize voice
+func ttsOGGGoogle(s, lang string) ([][]byte, error) {
 	req := tts_pb.SynthesizeSpeechRequest{
 		// Set the text input to be synthesized.
 		Input: &tts_pb.SynthesisInput{
@@ -124,7 +166,7 @@ func ttsOGGGoogle(s string) ([][]byte, error) {
 		// Build the voice request, select the language code ("en-US") and the SSML
 		// voice gender ("neutral").
 		Voice: &tts_pb.VoiceSelectionParams{
-			LanguageCode: "en-US",
+			LanguageCode: lang,
 			SsmlGender:   tts_pb.SsmlVoiceGender_NEUTRAL,
 		},
 		// Select the type of audio file you want returned.
@@ -135,7 +177,7 @@ func ttsOGGGoogle(s string) ([][]byte, error) {
 
 	resp, err := client.SynthesizeSpeech(context.TODO(), &req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create ogg, reseived error from google api: %w", err)
+		return nil, fmt.Errorf("failed to create ogg, received error from google api: %w", err)
 	}
 
 	log.Printf("ogg data created %d bytes", len(resp.AudioContent))
@@ -161,33 +203,23 @@ func makeOGGBuffer(in []byte) (output [][]byte, err error) {
 }
 
 // playOGG plays the current buffer to the provided channel.
-func playOGG(s *discordgo.Session, guildID, channelID string, oggBuf [][]byte) (err error) {
-
-	// Join the provided voice channel.
-	vc, err := s.ChannelVoiceJoin(guildID, channelID, false, true)
-	if err != nil {
-		return err
-	}
-
+func playOGG(conn *discordgo.VoiceConnection, oggBuf [][]byte) (err error) {
 	// Sleep for a specified amount of time before playing the sound
 	time.Sleep(250 * time.Millisecond)
 
 	// Start speaking.
-	vc.Speaking(true)
+	conn.Speaking(true)
 
 	// Send the buffer data.
 	for _, buff := range oggBuf {
-		vc.OpusSend <- buff
+		conn.OpusSend <- buff
 	}
 
 	// Stop speaking
-	vc.Speaking(false)
+	conn.Speaking(false)
 
 	// Sleep for a specificed amount of time before ending.
 	time.Sleep(250 * time.Millisecond)
-
-	// Disconnect from the provided voice channel.
-	vc.Disconnect()
 
 	return nil
 }
