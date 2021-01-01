@@ -53,6 +53,8 @@ func main() {
 		fmt.Println("Error opening Discord session: ", err)
 	}
 
+	go ttsTaskConsumer()
+
 	// Wait here until CTRL-C or other term signal is received.
 	fmt.Println("Airhorn is now running.  Press CTRL-C to exit.")
 	sc := make(chan os.Signal, 1)
@@ -167,6 +169,12 @@ func makeOGGBuffer(in []byte) (output [][]byte, err error) {
 }
 
 func byeHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
+	go func() {
+		for len(taskQueue) > 0 {
+			t := <-taskQueue
+			log.Panicf("task %s is discarded. remain task %d", t.text, len(taskQueue))
+		}
+	}()
 	conn, ok := dg.VoiceConnections[m.GuildID]
 	if !ok {
 		log.Print("not joining your voice channel")
@@ -180,32 +188,59 @@ func byeHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 	s.ChannelMessageSend(m.ChannelID, "Bye")
 }
 
+type task struct {
+	guildID string
+	text    string
+}
+
+const queueCap = 32
+
+var taskQueue = make(chan task, queueCap)
+
 func nonCommandHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
-	conn, ok := dg.VoiceConnections[m.GuildID]
+	t := task{
+		guildID: m.GuildID,
+		text:    m.Content,
+	}
+	select {
+	case taskQueue <- t:
+	default:
+		fmt.Println("discarding message due to chanel is full:", m.Content)
+	}
+}
+
+func ttsTaskConsumer() {
+	log.Print("start ttsTaskConsumer")
+	for {
+		time.Sleep(200 * time.Millisecond)
+		if t, ok := <-taskQueue; ok {
+			consumeOne(t)
+		}
+		println("ttsTaskConsumer: remain task", len(taskQueue))
+	}
+}
+
+func consumeOne(t task) {
+	conn, ok := dg.VoiceConnections[t.guildID]
 	if !ok {
+		log.Printf("voice channel on guild %s is deleted", t.guildID)
 		return
 	}
-	oggBuf, err := ttsOGGGoogle(m.Content, "ja-JP")
+
+	oggBuf, err := ttsOGGGoogle(t.text, "ja-JP")
 	if err != nil {
 		log.Printf("failed to create tts audio: %s", err.Error())
 		return
 	}
-	if err := playOGG(conn, oggBuf); err != nil {
-		log.Printf("failed to play ogg: %s", err.Error())
-	}
+	playOGG(conn, oggBuf)
 }
 
-func playOGG(conn *discordgo.VoiceConnection, oggBuf [][]byte) (err error) {
-	time.Sleep(250 * time.Millisecond)
+func playOGG(conn *discordgo.VoiceConnection, oggBuf [][]byte) {
 	conn.Speaking(true)
 	for _, buff := range oggBuf {
 		conn.OpusSend <- buff
 	}
-
 	conn.Speaking(false)
-	time.Sleep(250 * time.Millisecond)
-
-	return nil
 }
 
 func guildCreate(s *discordgo.Session, event *discordgo.GuildCreate) {
