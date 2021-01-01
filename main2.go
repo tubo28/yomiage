@@ -72,6 +72,10 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		hiHandler(s, m)
 	} else if strings.HasPrefix(m.Content, "!bye") {
 		byeHandler(s, m)
+	} else if strings.HasPrefix(m.Content, "!lang") {
+		// set users lang
+	} else if strings.HasPrefix(m.Content, "!rand") {
+		// randomize voice
 	} else if !strings.HasPrefix(m.Content, "!") {
 		nonCommandHandler(s, m)
 	}
