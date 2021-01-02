@@ -3,10 +3,37 @@ package main
 import (
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
 )
+
+func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
+	if strings.HasPrefix(m.Content, "!hi") {
+		if m.Author.ID == s.State.User.ID {
+			return
+		}
+		hiHandler(s, m)
+	} else if strings.HasPrefix(m.Content, "!bye") {
+		if m.Author.ID == s.State.User.ID {
+			return
+		}
+		byeHandler(s, m)
+	} else if strings.HasPrefix(m.Content, "!lang") {
+		if m.Author.ID == s.State.User.ID {
+			return
+		}
+		// set users lang
+	} else if strings.HasPrefix(m.Content, "!rand") {
+		if m.Author.ID == s.State.User.ID {
+			return
+		}
+		// randomize voice
+	} else if !strings.HasPrefix(m.Content, "!") {
+		nonCommandHandler(s, m)
+	}
+}
 
 func hiHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 	botID := m.Author.ID
