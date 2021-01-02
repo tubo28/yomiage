@@ -103,11 +103,13 @@ func doTask(t task) error {
 }
 
 func playOGG(conn *discordgo.VoiceConnection, oggBuf [][]byte) {
-	conn.Speaking(true)
+	if err := conn.Speaking(true); err != nil {
+	}
 	for _, buff := range oggBuf {
 		conn.OpusSend <- buff
 	}
-	conn.Speaking(false)
+	if err := conn.Speaking(false); err != nil {
+	}
 }
 
 func cleanerWorker() {

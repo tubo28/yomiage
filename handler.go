@@ -46,21 +46,27 @@ func hiHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 	if userVs == nil {
 		log.Printf("member %s is not joining any voice channel", botID)
-		s.ChannelMessageSend(m.ChannelID, "Cannot summon me without joining any voice channel")
+		if _, err := s.ChannelMessageSend(m.ChannelID, "Cannot summon me without joining any voice channel"); err != nil {
+			log.Print("error send message to channel ", m.ChannelID, " on guild ", guildID, ": ", err)
+		}
 		return
 	}
 
 	startWorker(guildID)
 	time.Sleep(200 * time.Millisecond) // waiting for bot to join voice channel
 	if msg := joinVC(s, m.GuildID, userVs.ChannelID); msg != "" {
-		s.ChannelMessageSend(m.ChannelID, msg)
+		if _, err := s.ChannelMessageSend(m.ChannelID, msg); err != nil {
+			log.Print("error send message to channel ", m.ChannelID, " on guild ", guildID, ": ", err)
+		}
 	}
 }
 
 func byeHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 	stopWorker(m.GuildID)
 	if msg := leaveVC(m.GuildID); msg != "" {
-		s.ChannelMessageSend(m.ChannelID, msg)
+		if _, err := s.ChannelMessageSend(m.ChannelID, msg); err != nil {
+			log.Print("error send message to channel ", m.ChannelID, " on guild ", m.GuildID, ": ", err)
+		}
 	}
 }
 
