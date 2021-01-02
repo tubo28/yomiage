@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	discordToken string = "Nzk0NDkzODg2ODI2ODA3MzI2.X-7oFw.Z2HjIydKzkCJ9B6PpsC-xxj-1RE"
+	discordToken string = os.Getenv("DISCORD_TOKEN")
 	dg           *discordgo.Session
 )
 
