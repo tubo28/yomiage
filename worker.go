@@ -40,7 +40,7 @@ func startWorker(guildID string) {
 		for {
 			select {
 			case <-w.done:
-				log.Print("worker is stopped")
+				log.Printf("stop worker. %d tasks remains", len(w.queue))
 				break L
 			case t, ok := <-w.queue:
 				if !ok {
@@ -108,4 +108,40 @@ func playOGG(conn *discordgo.VoiceConnection, oggBuf [][]byte) {
 		conn.OpusSend <- buff
 	}
 	conn.Speaking(false)
+}
+
+func cleanerWorker() {
+	for {
+		time.Sleep(10 * time.Second)
+		for gID := range ttsWorkers {
+			conn, ok := dg.VoiceConnections[gID]
+			if !ok {
+				continue
+			}
+			vcID := ""
+			g, err := dg.State.Guild(conn.GuildID)
+			if err != nil {
+				log.Print("failed to find guild by id ", err, ": ", err.Error())
+				continue
+			}
+			for _, vs := range g.VoiceStates {
+				if vs.UserID == conn.UserID {
+					vcID = vs.ChannelID
+					break
+				}
+			}
+			count := 0
+			for _, vs := range g.VoiceStates {
+				if vs.ChannelID == vcID {
+					count++
+				}
+			}
+
+			if count <= 1 {
+				log.Printf("bot is alone in channel %s on guild %s, leave", conn.ChannelID, gID)
+				stopWorker(gID)
+				_ = leaveVC(gID)
+			}
+		}
+	}
 }

@@ -46,18 +46,22 @@ func hiHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 	if userVs == nil {
 		log.Printf("member %s is not joining any voice channel", botID)
-		s.ChannelMessageSend(m.ChannelID, "cannot summon me without joining any voice channel")
+		s.ChannelMessageSend(m.ChannelID, "Cannot summon me without joining any voice channel")
 		return
 	}
 
 	startWorker(guildID)
 	time.Sleep(200 * time.Millisecond) // waiting for bot to join voice channel
-	joinVC(s, m.GuildID, userVs.ChannelID, m.ChannelID)
+	if msg := joinVC(s, m.GuildID, userVs.ChannelID); msg != "" {
+		s.ChannelMessageSend(m.ChannelID, msg)
+	}
 }
 
 func byeHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 	stopWorker(m.GuildID)
-	leaveVC(s, m.GuildID, m.ChannelID)
+	if msg := leaveVC(m.GuildID); msg != "" {
+		s.ChannelMessageSend(m.ChannelID, msg)
+	}
 }
 
 func nonCommandHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
@@ -68,17 +72,15 @@ func nonCommandHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 	addTask(m.GuildID, t)
 }
 
-func joinVC(s *discordgo.Session, guildID, vcID, tcID string) {
+func joinVC(s *discordgo.Session, guildID, vcID string) (msg string) {
 	if conn, ok := dg.VoiceConnections[guildID]; ok {
 		// todo: force move here?
 		if conn.ChannelID == vcID {
 			log.Printf("bot is already joining target voice channel %s guild %s", conn.ChannelID, conn.GuildID)
-			s.ChannelMessageSend(tcID, "already here")
-		} else {
-			log.Printf("bot is already joining other voice channel %s guild %s", conn.ChannelID, conn.GuildID)
-			s.ChannelMessageSend(tcID, "bot is already working on other channel")
+			return "Already here"
 		}
-		return
+		log.Printf("bot is already joining other voice channel %s guild %s", conn.ChannelID, conn.GuildID)
+		return "Already working on other channel"
 	}
 
 	if _, err := s.ChannelVoiceJoin(guildID, vcID, false, true); err != nil {
@@ -86,25 +88,21 @@ func joinVC(s *discordgo.Session, guildID, vcID, tcID string) {
 		return
 	}
 
-	// todo: install errcheck
-	if _, err := s.ChannelMessageSend(tcID, "I read text here"); err != nil {
-		log.Printf("failed to send message to channel %s", tcID)
-	}
-
+	return "I read text here"
 }
 
-func leaveVC(s *discordgo.Session, guildID, tcID string) {
+func leaveVC(guildID string) (msg string) {
 	conn, ok := dg.VoiceConnections[guildID]
 	if !ok {
-		log.Print("not joining your voice channel")
-		s.ChannelMessageSend(tcID, "not joining your voice channel")
-		return
+		return "Not joining your voice channel"
 	}
+
 	if err := conn.Disconnect(); err != nil {
 		log.Printf("error disconnect from voice channel %s: %s", conn.ChannelID, err.Error())
 		return
 	}
-	s.ChannelMessageSend(tcID, "Bye")
+
+	return "Bye"
 }
 
 func voiceState(s *discordgo.Session, userID, guildID string) (*discordgo.VoiceState, error) {
