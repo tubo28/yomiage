@@ -1,12 +1,14 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
 
+	tts "cloud.google.com/go/texttospeech/apiv1"
 	"github.com/bwmarrin/discordgo"
 )
 
@@ -15,7 +17,7 @@ var (
 	dg           *discordgo.Session
 )
 
-func init() {
+func main() {
 	if discordToken == "" {
 		log.Fatal("no discord token is given")
 	}
@@ -26,9 +28,12 @@ func init() {
 		fmt.Println("Error creating Discord session: ", err)
 		return
 	}
-}
 
-func main() {
+	ttsClient, err = tts.NewClient(context.TODO())
+	if err != nil {
+		log.Fatal("failed to create tts client: ", err.Error())
+	}
+
 	dg.AddHandler(messageCreate)
 	dg.AddHandler(guildCreate)
 
