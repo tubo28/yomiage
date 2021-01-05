@@ -55,7 +55,14 @@ func main() {
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
 	<-sc
 
-	if err := dg.Close(); err != nil {
-		log.Fatal(err.Error())
+	stat := 0
+	if err := db.Close(); err != nil {
+		log.Print(err.Error())
+		stat = 1
 	}
+	if err := dg.Close(); err != nil {
+		log.Print(err.Error())
+		stat = 1
+	}
+	os.Exit(stat)
 }
