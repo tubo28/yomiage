@@ -72,8 +72,10 @@ func byeHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 func nonCommandHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 	t := task{
-		guildID: m.GuildID,
-		text:    m.Content,
+		guildID:    m.GuildID,
+		text:       m.Content,
+		lang:       defaultTTSLang, // todo: use saved user's param
+		voiceToken: m.Author.ID,
 	}
 	addTask(m.GuildID, t)
 }

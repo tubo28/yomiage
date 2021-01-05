@@ -13,13 +13,17 @@ import (
 )
 
 var (
-	discordToken string = os.Getenv("DISCORD_TOKEN")
-	dg           *discordgo.Session
+	discordToken   string = os.Getenv("DISCORD_TOKEN")
+	defaultTTSLang string = os.Getenv("TTS_LANG")
+	dg             *discordgo.Session
 )
 
 func main() {
 	if discordToken == "" {
 		log.Fatal("no discord token is given")
+	}
+	if defaultTTSLang == "" {
+		defaultTTSLang = "en-US"
 	}
 
 	var err error

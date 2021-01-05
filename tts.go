@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"hash/fnv"
 	"io"
 	"log"
+	"math/rand"
 	"regexp"
 	"strings"
 
@@ -22,27 +24,49 @@ var (
 	kusaReg   = regexp.MustCompile("[wWｗＷ]+$")
 )
 
-// lang: https://cloud.google.com/text-to-speech/docs/voices
-// todo: randomize voice
-func ttsOGGGoogle(s, lang string) ([][]byte, error) {
-	s = Sanitize(s, lang)
-	if len(s) == 0 {
-		return nil, fmt.Errorf("empty text")
+func hash(s string) int64 {
+	h := fnv.New64()
+	h.Write([]byte(s))
+	x := h.Sum64() / 2
+	if x < 0 {
+		x = -x
 	}
-	req := tts_pb.SynthesizeSpeechRequest{
+	return int64(x)
+}
+
+func ttsReq(text, lang, voiceToken string) *tts_pb.SynthesizeSpeechRequest {
+	req := &tts_pb.SynthesizeSpeechRequest{
 		Input: &tts_pb.SynthesisInput{
-			InputSource: &tts_pb.SynthesisInput_Text{Text: s},
+			InputSource: &tts_pb.SynthesisInput_Text{Text: text},
 		},
 		Voice: &tts_pb.VoiceSelectionParams{
 			LanguageCode: lang,
-			SsmlGender:   tts_pb.SsmlVoiceGender_MALE,
 		},
 		AudioConfig: &tts_pb.AudioConfig{
 			AudioEncoding: tts_pb.AudioEncoding_OGG_OPUS,
 		},
 	}
 
-	resp, err := ttsClient.SynthesizeSpeech(context.TODO(), &req)
+	gs := []tts_pb.SsmlVoiceGender{tts_pb.SsmlVoiceGender_NEUTRAL, tts_pb.SsmlVoiceGender_MALE, tts_pb.SsmlVoiceGender_FEMALE}
+	rs := []float64{0.75, 1.0, 1.3, 1.7}
+	ps := []float64{-15, -8, 0, 8, 15}
+	r := rand.New(rand.NewSource(hash(voiceToken)))
+	req.Voice.SsmlGender = gs[r.Intn(len(gs))]
+	req.AudioConfig.SpeakingRate = rs[r.Intn(len(rs))]
+	req.AudioConfig.Pitch = ps[r.Intn(len(ps))]
+
+	return req
+}
+
+// lang: https://cloud.google.com/text-to-speech/docs/voices
+func ttsOGGGoogle(text, lang, voiceToken string) ([][]byte, error) {
+	text = Sanitize(text, lang)
+	if len(text) == 0 {
+		return nil, fmt.Errorf("empty text")
+	}
+	req := ttsReq(text, lang, voiceToken)
+
+	resp, err := ttsClient.SynthesizeSpeech(context.TODO(), req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create ogg, received error from google api: %w", err)
 	}
@@ -85,7 +109,7 @@ func sanitizeBytes(s []byte, lang string) []byte {
 	if ignoreReg.Match(b) {
 		return nil
 	}
-	if lang == "ja-JP" && kusaReg.Match(b) {
+	if (strings.HasPrefix(lang, "ja-") || lang == "ja") && kusaReg.Match(b) {
 		b = kusaReg.ReplaceAll(b, []byte(" くさ"))
 	}
 	return urlReg.ReplaceAll(b, []byte(" URL "))

@@ -9,8 +9,10 @@ import (
 )
 
 type task struct {
-	guildID string
-	text    string
+	guildID    string
+	text       string
+	lang       string
+	voiceToken string
 }
 
 type worker struct {
@@ -93,7 +95,7 @@ func doTask(t task) error {
 		return fmt.Errorf("voice channel on guild %s is deleted. maybe zombie worker", t.guildID)
 	}
 
-	oggBuf, err := ttsOGGGoogle(t.text, "ja-JP")
+	oggBuf, err := ttsOGGGoogle(t.text, t.lang, t.voiceToken)
 	if err != nil {
 		log.Printf("failed to create tts audio: %s", err.Error())
 		return nil
