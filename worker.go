@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
@@ -22,20 +23,20 @@ type worker struct {
 }
 
 // one worker per guild
-var ttsWorkers = make(map[string]*worker)
+var ttsWorkers sync.Map
 
 func startWorker(guildID string) {
-	w, ok := ttsWorkers[guildID]
+	_, ok := ttsWorkers.Load(guildID)
 	if ok {
 		log.Print("worker is already running for guild ", guildID)
 		return
 	}
-	w = &worker{
+	w := &worker{
 		guildID: guildID,
 		done:    make(chan bool),
 		queue:   make(chan task, 32),
 	}
-	ttsWorkers[guildID] = w
+	ttsWorkers.Store(guildID, w)
 
 	go func() {
 	L:
@@ -59,11 +60,12 @@ func startWorker(guildID string) {
 }
 
 func addTask(guildID string, t task) {
-	w, ok := ttsWorkers[guildID]
+	iw, ok := ttsWorkers.Load(guildID)
 	if !ok {
 		log.Printf("no worker for guild %s, task %s is discarded", guildID, t.text)
 		return
 	}
+	w := iw.(*worker)
 	select {
 	case w.queue <- t:
 		log.Print("task is added: ", t.text)
@@ -73,17 +75,18 @@ func addTask(guildID string, t task) {
 }
 
 func stopWorker(guildID string) {
-	w, ok := ttsWorkers[guildID]
+	iw, ok := ttsWorkers.Load(guildID)
 	if !ok {
 		log.Print("no worker for guild ", guildID)
 		return
 	}
+	w := iw.(*worker)
 	w.done <- true
 	close(w.queue)
 	for t := range w.queue {
 		log.Print("task is discorded because worker is stopped: ", t.text)
 	}
-	delete(ttsWorkers, guildID)
+	ttsWorkers.Delete(guildID)
 }
 
 func doTask(t task) error {
@@ -117,7 +120,13 @@ func playOGG(conn *discordgo.VoiceConnection, oggBuf [][]byte) {
 func cleanerWorker() {
 	for {
 		time.Sleep(10 * time.Second)
-		for gID := range ttsWorkers {
+		guilds := []string{}
+		ttsWorkers.Range(func(k interface{}, v interface{}) bool {
+			kk := k.(string)
+			guilds = append(guilds, kk)
+			return true
+		})
+		for _, gID := range guilds {
 			conn, ok := dg.VoiceConnections[gID]
 			if !ok {
 				continue
