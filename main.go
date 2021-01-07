@@ -14,7 +14,7 @@ import (
 
 var (
 	discordToken   string = os.Getenv("DISCORD_TOKEN")
-	defaultTTSLang string = os.Getenv("TTS_LANG")
+	defaultTTSLang string = os.Getenv("DEFAULT_TTS_LANG")
 	dg             *discordgo.Session
 )
 
