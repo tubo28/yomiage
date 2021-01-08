@@ -1,4 +1,4 @@
-package main
+package db
 
 import (
 	"database/sql"
@@ -37,6 +37,13 @@ func init() {
 
 	if _, err := db.Exec(createStmt); err != nil {
 		log.Fatal(err)
+	}
+}
+
+// Close closes db
+func Close() {
+	if err := db.Close(); err != nil {
+		log.Print("error closeing db: ", err.Error())
 	}
 }
 

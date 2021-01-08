@@ -10,6 +10,7 @@ import (
 
 	tts "cloud.google.com/go/texttospeech/apiv1"
 	"github.com/bwmarrin/discordgo"
+	"github.com/tubo28/yomiage/db"
 )
 
 var (
@@ -25,6 +26,8 @@ func main() {
 	if defaultTTSLang == "" {
 		defaultTTSLang = "en-US"
 	}
+
+	defer db.Close()
 
 	var err error
 	dg, err = discordgo.New("Bot " + discordToken)
@@ -56,10 +59,6 @@ func main() {
 	<-sc
 
 	stat := 0
-	if err := db.Close(); err != nil {
-		log.Print(err.Error())
-		stat = 1
-	}
 	if err := dg.Close(); err != nil {
 		log.Print(err.Error())
 		stat = 1
