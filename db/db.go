@@ -2,10 +2,9 @@ package db
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
-
-	_ "github.com/mattn/go-sqlite3"
 )
 
 var (
@@ -28,7 +27,8 @@ const (
 	`
 )
 
-func init() {
+// Init creates tables if not exists
+func Init() {
 	var err error
 	db, err = sql.Open("sqlite3", "./app.db")
 	if err != nil {
@@ -60,9 +60,9 @@ func UpsertUserLanguage(userID, voiceToken string) error {
 func upsertImpl(userID, val, col string) error {
 	var res string
 	err := db.QueryRow(`select discord_id from user where discord_id = ? limit 1`, userID).Scan(&res)
-	if err != nil && err != sql.ErrNoRows {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return fmt.Errorf("error select user by discord_id: %w", err)
-	} else if err == sql.ErrNoRows {
+	} else if errors.Is(err, sql.ErrNoRows) {
 		if _, err := db.Exec(`insert into user(discord_id, `+col+`) values(?, ?)`, userID, val); err != nil {
 			return fmt.Errorf("error insert new user: %w", err)
 		}
@@ -88,9 +88,9 @@ func GetUserLanguage(userID string) (string, error) {
 func getImpl(userID, col string) (string, error) {
 	var res string
 	err := db.QueryRow(`select `+col+` from user where discord_id = ? limit 1`, userID).Scan(&res)
-	if err != nil && err != sql.ErrNoRows {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return "", fmt.Errorf("error select user by discord_id: %w", err)
-	} else if err == sql.ErrNoRows {
+	} else if errors.Is(err, sql.ErrNoRows) {
 		return "", nil
 	} else {
 		return res, nil

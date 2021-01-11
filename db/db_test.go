@@ -5,8 +5,6 @@ import (
 	"log"
 	"os"
 	"testing"
-
-	_ "github.com/mattn/go-sqlite3"
 )
 
 func TestUpsertUserVoiceToken(t *testing.T) {

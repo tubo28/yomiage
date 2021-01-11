@@ -1,7 +1,9 @@
-package main
+package tts_test
 
 import (
 	"testing"
+
+	"github.com/tubo28/yomiage/tts"
 )
 
 func TestSanitize(t *testing.T) {
@@ -57,7 +59,7 @@ func TestSanitize(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := Sanitize(tt.args.s, tt.args.lang); got != tt.want {
+			if got := tts.Sanitize(tt.args.s, tt.args.lang); got != tt.want {
 				t.Errorf("Sanitize() = %v, want %v", got, tt.want)
 			}
 		})

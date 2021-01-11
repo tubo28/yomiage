@@ -1,8 +1,9 @@
-package main
+package tts
 
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"io"
@@ -11,18 +12,34 @@ import (
 	"regexp"
 	"strings"
 
-	tts "cloud.google.com/go/texttospeech/apiv1"
+	gtts "cloud.google.com/go/texttospeech/apiv1"
 	"github.com/jonas747/ogg"
-	tts_pb "google.golang.org/genproto/googleapis/cloud/texttospeech/v1"
+	gtts_pb "google.golang.org/genproto/googleapis/cloud/texttospeech/v1"
 	"mvdan.cc/xurls/v2"
 )
 
 var (
-	ttsClient *tts.Client
+	ttsClient *gtts.Client
 	urlReg    = xurls.Relaxed()
 	ignoreReg = regexp.MustCompile("^[(（)].*[）)]$")
 	kusaReg   = regexp.MustCompile("[wWｗＷ]+$")
 )
+
+// Init initializes Google TTS client
+func Init() {
+	var err error
+	ttsClient, err = gtts.NewClient(context.TODO())
+	if err != nil {
+		log.Fatal("failed to create tts client: ", err.Error())
+	}
+}
+
+// Close closes client
+func Close() {
+	if err := ttsClient.Close(); err != nil {
+		log.Print("error closing tts client: ", err.Error())
+	}
+}
 
 func hash(s string) int64 {
 	h := fnv.New64()
@@ -34,20 +51,20 @@ func hash(s string) int64 {
 	return int64(x)
 }
 
-func ttsReq(text, lang, voiceToken string) *tts_pb.SynthesizeSpeechRequest {
-	req := &tts_pb.SynthesizeSpeechRequest{
-		Input: &tts_pb.SynthesisInput{
-			InputSource: &tts_pb.SynthesisInput_Text{Text: text},
+func ttsReq(text, lang, voiceToken string) *gtts_pb.SynthesizeSpeechRequest {
+	req := &gtts_pb.SynthesizeSpeechRequest{
+		Input: &gtts_pb.SynthesisInput{
+			InputSource: &gtts_pb.SynthesisInput_Text{Text: text},
 		},
-		Voice: &tts_pb.VoiceSelectionParams{
+		Voice: &gtts_pb.VoiceSelectionParams{
 			LanguageCode: lang,
 		},
-		AudioConfig: &tts_pb.AudioConfig{
-			AudioEncoding: tts_pb.AudioEncoding_OGG_OPUS,
+		AudioConfig: &gtts_pb.AudioConfig{
+			AudioEncoding: gtts_pb.AudioEncoding_OGG_OPUS,
 		},
 	}
 
-	gs := []tts_pb.SsmlVoiceGender{tts_pb.SsmlVoiceGender_NEUTRAL, tts_pb.SsmlVoiceGender_MALE, tts_pb.SsmlVoiceGender_FEMALE}
+	gs := []gtts_pb.SsmlVoiceGender{gtts_pb.SsmlVoiceGender_NEUTRAL, gtts_pb.SsmlVoiceGender_MALE, gtts_pb.SsmlVoiceGender_FEMALE}
 	rs := []float64{0.75, 1.0, 1.3, 1.7}
 	ps := []float64{-15, -8, 0, 8, 15}
 	r := rand.New(rand.NewSource(hash(voiceToken)))
@@ -58,8 +75,8 @@ func ttsReq(text, lang, voiceToken string) *tts_pb.SynthesizeSpeechRequest {
 	return req
 }
 
-// lang: https://cloud.google.com/text-to-speech/docs/voices
-func ttsOGGGoogle(text, lang, voiceToken string) ([][]byte, error) {
+// OGGGoogle call Google Cloud TTS API
+func OGGGoogle(text, lang, voiceToken string) ([][]byte, error) {
 	text = Sanitize(text, lang)
 	if len(text) == 0 {
 		return nil, fmt.Errorf("empty text")
@@ -83,7 +100,7 @@ func makeOGGBuffer(in []byte) (output [][]byte, err error) {
 	for {
 		packet, _, err := pd.Decode()
 		if err != nil {
-			if err != io.EOF {
+			if !errors.Is(err, io.EOF) {
 				return nil, fmt.Errorf("error decode on PacketDecoder: %w", err)
 			}
 			return output, nil
