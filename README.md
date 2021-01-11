@@ -50,3 +50,4 @@ export DEFAULT_TTS_LANG=en-US
 
 - [DiscordGo](https://github.com/bwmarrin/discordgo)
 - [Google Cloud Text-to-Speech](https://cloud.google.com/text-to-speech)
+- SQLite 3

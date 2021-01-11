@@ -24,6 +24,7 @@ func init() {
 	}
 }
 
+// Init adds handlers to discord
 func Init() {
 	discord.AddHandler(guildCreate)
 	discord.AddHandler(messageCreate)

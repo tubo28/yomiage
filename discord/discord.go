@@ -20,6 +20,7 @@ func init() {
 	}
 }
 
+// Init create and starts Discord client
 func Init() {
 	var err error
 	dg, err = discordgo.New("Bot " + discordToken)
@@ -42,10 +43,12 @@ func Close() {
 	}
 }
 
-func AddHandler(f interface{}) {
-	dg.AddHandler(f)
+// AddHandler adds handler h to global discord client
+func AddHandler(h interface{}) {
+	dg.AddHandler(h)
 }
 
+// JoinVC adds the bot to guild
 func JoinVC(s *discordgo.Session, guildID, vcID string) (msg string) {
 	if conn, ok := dg.VoiceConnections[guildID]; ok {
 		// todo: force move here?
@@ -65,6 +68,7 @@ func JoinVC(s *discordgo.Session, guildID, vcID string) (msg string) {
 	return "I read text here"
 }
 
+// LeaveVC removes the bot from guild
 func LeaveVC(guildID string) (msg string) {
 	conn, ok := dg.VoiceConnections[guildID]
 	if !ok {
