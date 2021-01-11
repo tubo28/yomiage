@@ -58,7 +58,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 func langHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 	arg := strings.Fields(m.Content)
 	arg = arg[1:]
-	if len(arg) == 0 || arg[0] == "get" {
+	if len(arg) == 0 {
 		// get language
 		lang, err := db.GetUserLanguage(m.Author.ID)
 		if err != nil {

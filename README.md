@@ -6,17 +6,19 @@
 
 Text-to-speech bot for Discord.
 
-## Features
+## Commands
 
-- `!hi`: Summon the bot. Reads the text channel in which this command is send on the voice channel you are joining.
-- `!bye`: Stop reading.
-- `!rand`: Randomize voice to read your text.
-- `!lang` or `!lang get`: Get the language to reads your text.
-- `!lang set <language code>`: Set the language to reads your text to `<language code>`. See language selection section for details of `!lang` command.
+| Command                     |                                                                                                            |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `!hi`                       | Summon the bot. Reads the text channel in which this command is send on the voice channel you are joining. |
+| `!bye`                      | Stop reading.                                                                                              |
+| `!rand`                     | Randomize voice to read your text.                                                                         |
+| `!lang`                     | Get the language to reads your text.                                                                       |
+| `!lang set <language code>` | Set the language to reads your text to `<language code>`. See "language selection" section for the details.  |
 
 ## Language selection
 
-The "language code" to read each user's text is selected based on the following rules in that order:
+The language code to read each user's text is selected based on the following rules in that order:
 
 1. `DEFAULT_TTS_LANG` environment variable if set.
 2. Language set by `!lang` command if set.
