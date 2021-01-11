@@ -10,11 +10,11 @@ Text-to-speech bot for Discord.
 
 | Command                     |                                                                                                            |
 | --------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `!hi`                       | Summon the bot. Reads the text channel in which this command is send on the voice channel you are joining. |
+| `!hi`                       | Summon the bot. The bot will read out the text of the channel where this command was entered.              |
 | `!bye`                      | Stop reading.                                                                                              |
 | `!rand`                     | Randomize voice to read your text.                                                                         |
-| `!lang`                     | Get the language to reads your text.                                                                       |
-| `!lang set <language code>` | Set the language to reads your text to `<language code>`. See "language selection" section for the details.  |
+| `!lang`                     | Get the language to read your text.                                                                        |
+| `!lang set <language code>` | Set the language to read your text to `<language code>`. See "language selection" section for the details. |
 
 ## Language selection
 
