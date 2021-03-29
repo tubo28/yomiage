@@ -89,7 +89,7 @@ func getImpl(userID, col string) (string, error) {
 	var res string
 	err := db.QueryRow(`select `+col+` from user where discord_id = ? limit 1`, userID).Scan(&res)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return "", fmt.Errorf("error select user by discord_id: %w", err)
+		return "", fmt.Errorf("error get column of "+col+" by select user by discord_id: %w", err)
 	} else if errors.Is(err, sql.ErrNoRows) {
 		return "", nil
 	} else {

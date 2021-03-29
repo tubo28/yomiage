@@ -15,6 +15,7 @@ Text-to-speech bot for Discord.
 | `!rand`                     | Randomize voice to read your text.                                                                         |
 | `!lang`                     | Get the language to read your text.                                                                        |
 | `!lang set <language code>` | Set the language to read your text to `<language code>`. See "language selection" section for the details. |
+| `!help`                     | Show usage.                                                                                                |
 
 ## Language selection
 

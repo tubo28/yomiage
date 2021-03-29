@@ -51,6 +51,11 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			return
 		}
 		randHandler(s, m)
+	} else if strings.HasPrefix(m.Content, "!help") {
+		if m.Author.ID == s.State.User.ID {
+			return
+		}
+		helpHandler(s, m)
 	} else if !strings.HasPrefix(m.Content, "!") {
 		nonCommandHandler(s, m)
 	}
@@ -141,11 +146,26 @@ func byeHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 }
 
+func helpHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
+	msg := "Read this: https://github.com/tubo28/yomiage/blob/main/README.md"
+	if _, err := s.ChannelMessageSend(m.ChannelID, msg); err != nil {
+		log.Print("error send message to channel ", m.ChannelID, " on guild ", m.GuildID, ": ", err)
+	}
+}
+
 func nonCommandHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
+	lang, err := db.GetUserLanguage(m.Author.ID)
+	if err != nil {
+		log.Print("error get user "+m.Author.ID+"'s langage: ", err)
+	}
+	if lang == "" {
+		lang = defaultTTSLang
+	}
+
 	t := worker.TTSTask{
 		GuildID:    m.GuildID,
 		Text:       m.Content,
-		Lang:       defaultTTSLang, // todo: use saved user's param
+		Lang:       lang,
 		VoiceToken: m.Author.ID,
 	}
 	worker.AddTask(m.GuildID, t)
@@ -158,7 +178,7 @@ func guildCreate(s *discordgo.Session, event *discordgo.GuildCreate) {
 
 	for _, channel := range event.Guild.Channels {
 		if channel.ID == event.Guild.ID {
-			_, _ = s.ChannelMessageSend(channel.ID, "Airhorn is ready! Type !airhorn while in a voice channel to play a sound.")
+			_, _ = s.ChannelMessageSend(channel.ID, "Yomiage is ready! Type `!hi` to start reading text channel. Type `!help` to show help.")
 			return
 		}
 	}
