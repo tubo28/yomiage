@@ -65,8 +65,8 @@ func ttsReq(text, lang, voiceToken string) *gtts_pb.SynthesizeSpeechRequest {
 	}
 
 	gs := []gtts_pb.SsmlVoiceGender{gtts_pb.SsmlVoiceGender_NEUTRAL, gtts_pb.SsmlVoiceGender_MALE, gtts_pb.SsmlVoiceGender_FEMALE}
-	rs := []float64{0.75, 1.0, 1.3, 1.7}
-	ps := []float64{-15, -8, 0, 8, 15}
+	rs := []float64{0.75, 1.0, 1.2, 1.4}
+	ps := []float64{-5, 0, 5, 8}
 	r := rand.New(rand.NewSource(hash(voiceToken)))
 	req.Voice.SsmlGender = gs[r.Intn(len(gs))]
 	req.AudioConfig.SpeakingRate = rs[r.Intn(len(rs))]
