@@ -87,6 +87,14 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			randHandler(s, m, args[1:])
 			return
 		}
+		// todo
+		// if head == "rand" {
+		// 	if m.Author.ID == s.State.User.ID {
+		// 		return
+		// 	}
+		// 	randHandler(s, m, args)
+		// 	return
+		// }
 		return
 	}
 
@@ -196,11 +204,6 @@ func hiHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 		voiceChannelID: userVs.ChannelID,
 		textChannelID:  m.ChannelID,
 	})
-
-	println(userVs.ChannelID)
-	println(s.State.GuildChannel(guildID, userVs.ChannelID))
-	println(m.ChannelID)
-	println(s.State.GuildChannel(guildID, m.ChannelID))
 
 	worker.StartWorker(guildID)
 	time.Sleep(200 * time.Millisecond) // waiting for bot to join voice channel
@@ -319,7 +322,7 @@ func nonCommandHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 		GuildID:    m.GuildID,
 		Text:       Sanitize(m.Content, lang, m.Mentions),
 		Lang:       lang,
-		VoiceToken: m.Author.ID,
+		VoiceToken: m.Author.ID, // todo
 	}
 	worker.AddTask(m.GuildID, t)
 }

@@ -12,10 +12,10 @@ Text-to-speech bot for Discord.
 | --------------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | `!hi`                             | Summon the bot. The bot will read out the text of the channel where this command was entered.              |
 | `!bye`                            | Stop reading.                                                                                              |
-| `@<bot> rand`                     | Randomize voice to read your text.                                                                         |
+| `@<bot> help`                     | Show usage.                                                                                                |
 | `@<bot> lang`                     | Get the language to read your text.                                                                        |
 | `@<bot> lang set <language code>` | Set the language to read your text to `<language code>`. See "language selection" section for the details. |
-| `@<bot> help`                     | Show usage.                                                                                                |
+| `@<bot> rand`                     | (todo) Randomize voice to read your text.                                                                         |
 
 ## Language selection
 
