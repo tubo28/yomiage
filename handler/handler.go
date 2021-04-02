@@ -72,19 +72,12 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		}
 
 		args := strings.Fields(noMentionContent)
-		var head string
+		head, args := args[0], args[1:]
 		if head == "lang" {
 			if m.Author.ID == s.State.User.ID {
 				return
 			}
-			langHandler(s, m, args[1:])
-			return
-		}
-		if head == "rand" {
-			if m.Author.ID == s.State.User.ID {
-				return
-			}
-			randHandler(s, m, args[1:])
+			langHandler(s, m, args)
 			return
 		}
 		// todo
