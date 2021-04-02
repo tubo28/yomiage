@@ -32,6 +32,12 @@ func Init() {
 }
 
 func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
+	defer func() {
+		if err := recover(); err != nil {
+			fmt.Println("recovered: ", err)
+		}
+	}()
+
 	if strings.HasPrefix(m.Content, "!hi") {
 		if m.Author.ID == s.State.User.ID {
 			return
