@@ -42,10 +42,15 @@ This is passed to `language_code` parameter of [VoiceSelectionParams](https://cl
 ```sh
 go build
 export GOOGLE_APPLICATION_CREDENTIALS=credentials.json
-export DISCORD_TOKEN=XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 export DEFAULT_TTS_LANG=en-US
+export DISCORD_TOKEN=XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 ./yomiage
 ```
+
+## Deploy
+
+1. Write Discord token to `secret.env` like `secret.env.sample`
+1. `docker-compose up`
 
 ## Depends on
 
