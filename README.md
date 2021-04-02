@@ -8,14 +8,14 @@ Text-to-speech bot for Discord.
 
 ## Commands
 
-| Command                     |                                                                                                            |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `!hi`                       | Summon the bot. The bot will read out the text of the channel where this command was entered.              |
-| `!bye`                      | Stop reading.                                                                                              |
-| `!rand`                     | Randomize voice to read your text.                                                                         |
-| `!lang`                     | Get the language to read your text.                                                                        |
-| `!lang set <language code>` | Set the language to read your text to `<language code>`. See "language selection" section for the details. |
-| `!help`                     | Show usage.                                                                                                |
+| Command                           |                                                                                                            |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `!hi`                             | Summon the bot. The bot will read out the text of the channel where this command was entered.              |
+| `!bye`                            | Stop reading.                                                                                              |
+| `@<bot> rand`                     | Randomize voice to read your text.                                                                         |
+| `@<bot> lang`                     | Get the language to read your text.                                                                        |
+| `@<bot> lang set <language code>` | Set the language to read your text to `<language code>`. See "language selection" section for the details. |
+| `@<bot> help`                     | Show usage.                                                                                                |
 
 ## Language selection
 
