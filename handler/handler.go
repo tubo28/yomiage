@@ -55,7 +55,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 
 	// if content starts with mention string to bot,
-	prefixPatStr := fmt.Sprintf(`^\s*<@!?%s>`, s.State.User.ID)
+	prefixPatStr := fmt.Sprintf(`^\s*<@!?%s>`, s.State.User.ID) // '<@1234> ...' or '<@!1234> ...'
 	prefixPat, err := regexp.Compile(prefixPatStr)
 	if err != nil {
 		log.Print("failed to compile mention prefix regexp: ", prefixPatStr)
