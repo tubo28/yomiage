@@ -18,5 +18,6 @@ require (
 	golang.org/x/text v0.3.6 // indirect
 	google.golang.org/api v0.43.0 // indirect
 	google.golang.org/genproto v0.0.0-20210402141018-6c239bbf2bb1
+	mvdan.cc/xurls v1.1.0 // indirect
 	mvdan.cc/xurls/v2 v2.2.0
 )

@@ -32,11 +32,11 @@ func Init() {
 	var err error
 	db, err = sql.Open("sqlite3", "db-data/app.db")
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("failed to open db: ", err)
 	}
 
 	if _, err := db.Exec(createStmt); err != nil {
-		log.Fatal(err)
+		log.Fatal("failed to initialize db: ", err)
 	}
 }
 

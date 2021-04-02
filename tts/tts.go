@@ -9,20 +9,14 @@ import (
 	"io"
 	"log"
 	"math/rand"
-	"regexp"
-	"strings"
 
 	gtts "cloud.google.com/go/texttospeech/apiv1"
 	"github.com/jonas747/ogg"
 	gtts_pb "google.golang.org/genproto/googleapis/cloud/texttospeech/v1"
-	"mvdan.cc/xurls/v2"
 )
 
 var (
 	ttsClient *gtts.Client
-	urlReg    = xurls.Relaxed()
-	ignoreReg = regexp.MustCompile("^[(（)].*[）)]$")
-	kusaReg   = regexp.MustCompile("[wWｗＷ]+$")
 )
 
 // Init initializes Google TTS client
@@ -77,7 +71,6 @@ func ttsReq(text, lang, voiceToken string) *gtts_pb.SynthesizeSpeechRequest {
 
 // OGGGoogle call Google Cloud TTS API
 func OGGGoogle(text, lang, voiceToken string) ([][]byte, error) {
-	text = Sanitize(text, lang)
 	if len(text) == 0 {
 		return nil, fmt.Errorf("empty text")
 	}
@@ -107,27 +100,4 @@ func makeOGGBuffer(in []byte) (output [][]byte, err error) {
 		}
 		output = append(output, packet)
 	}
-}
-
-// Sanitize modifies s easier to read in following steps:
-// 1. trim spaces
-// 2. replace continuous 'w's to kusa
-// 3. replace URL to "URL"
-// 4. replace continuous whitespaces to single one
-func Sanitize(s, lang string) string {
-	s = strings.TrimSpace(s)
-	b := sanitizeBytes([]byte(s), lang)
-	s = string(b)
-	return strings.Join(strings.Fields(s), " ")
-}
-
-func sanitizeBytes(s []byte, lang string) []byte {
-	b := []byte(s)
-	if ignoreReg.Match(b) {
-		return nil
-	}
-	if (strings.HasPrefix(lang, "ja-") || lang == "ja") && kusaReg.Match(b) {
-		b = kusaReg.ReplaceAll(b, []byte(" くさ"))
-	}
-	return urlReg.ReplaceAll(b, []byte(" URL "))
 }

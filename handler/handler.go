@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/tubo28/yomiage/db"
 	"github.com/tubo28/yomiage/discord"
 	"github.com/tubo28/yomiage/worker"
+	"mvdan.cc/xurls"
 )
 
 var (
@@ -36,35 +38,59 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			return
 		}
 		hiHandler(s, m)
-	} else if strings.HasPrefix(m.Content, "!bye") {
+		return
+	}
+
+	if strings.HasPrefix(m.Content, "!bye") {
 		if m.Author.ID == s.State.User.ID {
 			return
 		}
 		byeHandler(s, m)
-	} else if strings.HasPrefix(m.Content, "!lang") {
-		if m.Author.ID == s.State.User.ID {
+		return
+	}
+
+	// if content starts with mention string to bot,
+	prefixPatStr := fmt.Sprintf(`^\s*<@!?%s>`, s.State.User.ID)
+	prefixPat, err := regexp.Compile(prefixPatStr)
+	if err != nil {
+		log.Print("failed to compile mention prefix regexp: ", prefixPatStr)
+	}
+	if prefixPat != nil && prefixPat.MatchString(m.Content) {
+		content := strings.TrimSpace(prefixPat.ReplaceAllString(m.Content, ""))
+		args := strings.Fields(content)
+		head := args[0]
+		tail := args[1:]
+		if head == "lang" {
+			if m.Author.ID == s.State.User.ID {
+				return
+			}
+			langHandler(s, m, tail)
 			return
 		}
-		langHandler(s, m)
-	} else if strings.HasPrefix(m.Content, "!rand") {
-		if m.Author.ID == s.State.User.ID {
+		if head == "rand" {
+			if m.Author.ID == s.State.User.ID {
+				return
+			}
+			randHandler(s, m, tail)
 			return
 		}
-		randHandler(s, m)
-	} else if strings.HasPrefix(m.Content, "!help") {
-		if m.Author.ID == s.State.User.ID {
+		if head == "help" {
+			if m.Author.ID == s.State.User.ID {
+				return
+			}
+			helpHandler(s, m)
 			return
 		}
-		helpHandler(s, m)
-	} else if !strings.HasPrefix(m.Content, "!") {
+		return
+	}
+
+	if !strings.HasPrefix(m.Content, "!") {
 		nonCommandHandler(s, m)
 	}
 }
 
-func langHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
-	arg := strings.Fields(m.Content)
-	arg = arg[1:]
-	if len(arg) == 0 {
+func langHandler(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
+	if len(args) == 0 {
 		// get language
 		lang, err := db.GetUserLanguage(m.Author.ID)
 		if err != nil {
@@ -75,10 +101,10 @@ func langHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 		msg := fmt.Sprintf("%s の読み上げ言語は %s です。", m.Author.Username, lang)
 		if _, err := s.ChannelMessageSend(m.ChannelID, msg); err != nil {
 		}
-	} else if arg[0] == "set" {
+	} else if args[0] == "set" {
 		// set language
-		arg = arg[1:]
-		lang := arg[0]
+		args = args[1:]
+		lang := args[0]
 		if err := db.UpsertUserLanguage(m.Author.ID, lang); err != nil {
 			log.Print("error update user ", m.Author.ID, "'s language to ", lang, ": ", err.Error())
 			return
@@ -90,13 +116,13 @@ func langHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 }
 
-func randHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
+func randHandler(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 	// generate random token and set for user
 	u, _ := uuid.NewUUID()
 	vt := u.String()
 	err := db.UpsertUserVoiceToken(m.Author.ID, vt)
 	if err != nil {
-		log.Print("error update user voice token ", m.Author.ID, "'s token", err.Error())
+		log.Print("error update user voice token ", m.Author.ID, "'s token: ", err.Error())
 		return
 	}
 	// Randomized your voice.
@@ -168,11 +194,56 @@ func nonCommandHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 	t := worker.TTSTask{
 		GuildID:    m.GuildID,
-		Text:       m.Content,
+		Text:       Sanitize(m.Content, lang, m.Mentions),
 		Lang:       lang,
 		VoiceToken: m.Author.ID,
 	}
 	worker.AddTask(m.GuildID, t)
+}
+
+var (
+	urlReg    = xurls.Relaxed
+	ignoreReg = regexp.MustCompile("^[(（)].*[）)]$")
+	kusaReg   = regexp.MustCompile("[wWｗＷ]+$")
+)
+
+// Sanitize modifies m.Content easier to read for bot in following steps:
+// 1. trim spaces
+// 2. replace mention string to user name
+// 3. replace continuous 'w's to kusa
+// 4. replace URL to "URL"
+// 5. replace continuous whitespaces to single one
+func Sanitize(content, lang string, mentions []*discordgo.User) string {
+	s := strings.TrimSpace(content)
+
+	// 1
+	if ignoreReg.MatchString(s) {
+		return ""
+	}
+
+	// 2
+	for _, user := range mentions {
+		mentionPatStr := fmt.Sprintf(`<@!?%s>`, user.ID)
+		mentionPat, err := regexp.Compile(mentionPatStr)
+		if err != nil {
+			log.Printf("failed to compile mention pattern %s to regexp: %s", mentionPat, err)
+			continue
+		}
+		s = mentionPat.ReplaceAllString(s, user.Username)
+	}
+
+	// 3
+	if (strings.HasPrefix(lang, "ja-") || lang == "ja") && kusaReg.MatchString(s) {
+		s = kusaReg.ReplaceAllString(s, " くさ")
+	}
+
+	// 4
+	s = urlReg.ReplaceAllString(s, " URL ")
+
+	// 5
+	s = strings.Join(strings.Fields(s), " ")
+
+	return s
 }
 
 func guildCreate(s *discordgo.Session, event *discordgo.GuildCreate) {
