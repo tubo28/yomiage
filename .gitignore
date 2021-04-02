@@ -1,4 +1,5 @@
 .vscode
 credentials.json
 yomiage
-*.db
+*.env
+/db-data

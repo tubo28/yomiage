@@ -30,7 +30,7 @@ const (
 // Init creates tables if not exists
 func Init() {
 	var err error
-	db, err = sql.Open("sqlite3", "./app.db")
+	db, err = sql.Open("sqlite3", "db-data/app.db")
 	if err != nil {
 		log.Fatal(err)
 	}

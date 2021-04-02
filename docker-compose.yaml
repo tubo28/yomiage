@@ -1,0 +1,28 @@
+version: "3.9"
+
+services:
+  bot-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - secret.env
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/run/secrets/google-app-credentials
+      - DEFAULT_TTS_LANG=ja-JP
+    restart: always
+    logging:
+      options:
+        max-size: "1G"
+        max-file: "4"
+    secrets:
+      - google-app-credentials
+    volumes:
+      - ./db-data:/db-data
+
+volumes:
+  db-data:
+
+secrets:
+  google-app-credentials:
+    file: credentials.json
