@@ -71,7 +71,8 @@ func langHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 			log.Print("error get user ", m.Author.ID, "'s language: ", err.Error())
 			return
 		}
-		msg := fmt.Sprintf("User %s's language is %s", m.Author.Username, lang)
+		// User %s's language is %s.
+		msg := fmt.Sprintf("%s の読み上げ言語は %s です。", m.Author.Username, lang)
 		if _, err := s.ChannelMessageSend(m.ChannelID, msg); err != nil {
 		}
 	} else if arg[0] == "set" {
@@ -82,7 +83,8 @@ func langHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 			log.Print("error update user ", m.Author.ID, "'s language to ", lang, ": ", err.Error())
 			return
 		}
-		msg := fmt.Sprintf("User %s's language is updated to %s", m.Author.Username, lang)
+		// User %s's language is updated to %s
+		msg := fmt.Sprintf("%s の読み上げ言語を %s に変更しました。", m.Author.Username, lang)
 		if _, err := s.ChannelMessageSend(m.ChannelID, msg); err != nil {
 		}
 	}
@@ -97,15 +99,17 @@ func randHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 		log.Print("error update user voice token ", m.Author.ID, "'s token", err.Error())
 		return
 	}
-	if _, err := s.ChannelMessageSend(m.ChannelID, "Randomized your voice."); err != nil {
+	// Randomized your voice.
+	if _, err := s.ChannelMessageSend(m.ChannelID, "声を変更しました。"); err != nil {
 	}
-	lang, err := db.GetUserLanguage(m.Author.ID)
+	var lang string
+	lang, err = db.GetUserLanguage(m.Author.ID)
 	if err != nil {
-		// todo: default
+		lang = defaultTTSLang
 	}
 	worker.AddTask(m.GuildID, worker.TTSTask{
 		GuildID:    m.GuildID,
-		Text:       "this is sample, hello, hello!",
+		Text:       "サンプル、イカよろしく～", // This is test
 		Lang:       lang,
 		VoiceToken: vt,
 	})
@@ -147,7 +151,7 @@ func byeHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 }
 
 func helpHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
-	msg := "Read this: https://github.com/tubo28/yomiage/blob/main/README.md"
+	msg := "https://github.com/tubo28/yomiage/blob/main/README.md"
 	if _, err := s.ChannelMessageSend(m.ChannelID, msg); err != nil {
 		log.Print("error send message to channel ", m.ChannelID, " on guild ", m.GuildID, ": ", err)
 	}
@@ -178,7 +182,7 @@ func guildCreate(s *discordgo.Session, event *discordgo.GuildCreate) {
 
 	for _, channel := range event.Guild.Channels {
 		if channel.ID == event.Guild.ID {
-			_, _ = s.ChannelMessageSend(channel.ID, "Yomiage is ready! Type `!hi` to start reading text channel. Type `!help` to show help.")
+			_, _ = s.ChannelMessageSend(channel.ID, "読み上げくんの準備ができました。 `!hi` で呼び出せます。`!help` で使い方を表示します。")
 			return
 		}
 	}

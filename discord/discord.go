@@ -57,7 +57,7 @@ func JoinVC(s *discordgo.Session, guildID, vcID string) (msg string) {
 			return "Already here"
 		}
 		log.Printf("bot is already joining other voice channel %s guild %s", conn.ChannelID, conn.GuildID)
-		return "Already working on other channel"
+		return "すでに他のボイスチャンネルにいます" // Already working on other channel
 	}
 
 	if _, err := s.ChannelVoiceJoin(guildID, vcID, false, true); err != nil {
@@ -65,14 +65,14 @@ func JoinVC(s *discordgo.Session, guildID, vcID string) (msg string) {
 		return
 	}
 
-	return "I read text here"
+	return "読み上げます" // I read text here
 }
 
 // LeaveVC removes the bot from guild
 func LeaveVC(guildID string) (msg string) {
 	conn, ok := dg.VoiceConnections[guildID]
 	if !ok {
-		return "Not joining your voice channel"
+		return "あなたが参加しているボイスチャンネルにbotがいません" // Bot is not joining your voice channel
 	}
 
 	if err := conn.Disconnect(); err != nil {
@@ -80,7 +80,7 @@ func LeaveVC(guildID string) (msg string) {
 		return
 	}
 
-	return "Bye"
+	return "さようなら" // Bye
 }
 
 // VoiceState return discordgo.VoiceState of the guild on the user
