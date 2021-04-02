@@ -20,9 +20,6 @@ services:
     volumes:
       - ./db-data:/db-data
 
-volumes:
-  db-data:
-
 secrets:
   google-app-credentials:
     file: credentials.json
