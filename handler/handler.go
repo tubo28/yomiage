@@ -6,6 +6,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
@@ -131,7 +132,7 @@ func randHandler(s *discordgo.Session, m *discordgo.MessageCreate, args []string
 		return
 	}
 	// Randomized your voice.
-	if _, err := s.ChannelMessageSend(m.ChannelID, "声を変更しました。"); err != nil {
+	if _, err := s.ChannelMessageSend(m.ChannelID, m.Author.Username+"の声を変更しました。"); err != nil {
 	}
 	var lang string
 	lang, err = db.GetUserLanguage(m.Author.ID)
@@ -146,22 +147,60 @@ func randHandler(s *discordgo.Session, m *discordgo.MessageCreate, args []string
 	})
 }
 
+type channelBinding struct {
+	voiceChannelID string
+	textChannelID  string
+}
+
+// maps guildID to channelBinding to read
+// also works as flag whether the bot is working on a guild
+var bindings sync.Map
+
 func hiHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
-	botID := m.Author.ID
+	authorID := m.Author.ID
 	guildID := m.GuildID
 
-	userVs, err := discord.VoiceState(s, botID, guildID)
+	// Bot is not working on this guild?
+	if cid, ok := bindings.Load(guildID); ok {
+		log.Printf("bot is already joining voice channel %s this guild %s", cid, m.GuildID)
+		ch, err := s.State.GuildChannel(guildID, m.ChannelID)
+		if err != nil {
+			log.Printf("error find guild %s channel %s", guildID, m.ChannelID)
+			return
+		}
+		// Already working on other channel
+		msg := fmt.Sprintf("すでにこのサーバーのボイスチャンネル %s を読み上げ中です。", ch.Name)
+		if _, err := s.ChannelMessageSend(m.ChannelID, msg); err != nil {
+			log.Print("error send message to channel ", m.ChannelID, " on guild ", guildID, ": ", err)
+		}
+		return
+	}
+
+	// The command author is joining in a voice channel?
+	userVs, err := discord.VoiceState(s, authorID, guildID)
 	if err != nil {
 		log.Printf("failed to get VoiceState of guild %s: %s", guildID, err.Error())
 		return
 	}
 	if userVs == nil {
-		log.Printf("member %s is not joining any voice channel", botID)
-		if _, err := s.ChannelMessageSend(m.ChannelID, "Cannot summon me without joining any voice channel"); err != nil {
+		log.Printf("member %s is not joining any voice channel", authorID)
+		// Cannot summon the bot without joining any voice channel
+		if _, err := s.ChannelMessageSend(m.ChannelID, "ボイスチャンネルに参加せずに呼び出すことはできません。"); err != nil {
 			log.Print("error send message to channel ", m.ChannelID, " on guild ", guildID, ": ", err)
 		}
 		return
 	}
+
+	// Ok, then start worker
+	bindings.Store(guildID, channelBinding{
+		voiceChannelID: userVs.ChannelID,
+		textChannelID:  m.ChannelID,
+	})
+
+	println(userVs.ChannelID)
+	println(s.State.GuildChannel(guildID, userVs.ChannelID))
+	println(m.ChannelID)
+	println(s.State.GuildChannel(guildID, m.ChannelID))
 
 	worker.StartWorker(guildID)
 	time.Sleep(200 * time.Millisecond) // waiting for bot to join voice channel
@@ -173,6 +212,73 @@ func hiHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 }
 
 func byeHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
+	userID := m.Author.ID
+	botID := s.State.User.ID
+	guildID := m.GuildID
+
+	// Bot is working on this guild?
+	bi, ok := bindings.Load(guildID)
+	if !ok {
+		log.Print("not working on this guild ", guildID)
+		// Not working on this guild
+		if _, err := s.ChannelMessageSend(m.ChannelID, "現在このサーバーでは読み上げていません。"); err != nil {
+			log.Print("error send message to channel ", m.ChannelID, " on guild ", guildID, ": ", err)
+		}
+		return
+	}
+
+	b := bi.(channelBinding)
+
+	// Text channel on which the commend was post is the working text channel of bot?
+	if m.ChannelID != b.textChannelID {
+		log.Printf("member %s is not joining voice channel bot is reading %s", userID, b.voiceChannelID)
+		thisCh, err := s.State.GuildChannel(guildID, m.ChannelID)
+		if err != nil {
+			log.Printf("error find guild %s channel %s", guildID, m.ChannelID)
+			return
+		}
+		wrkCh, err := s.State.GuildChannel(guildID, b.textChannelID)
+		if err != nil {
+			log.Printf("error find guild %s channel %s", guildID, m.ChannelID)
+			return
+		}
+		msg := fmt.Sprintf("このテキストチャンネル %s は読み上げていません。%s を読み上げ中です。", thisCh.Name, wrkCh.Name)
+		if _, err := s.ChannelMessageSend(m.ChannelID, msg); err != nil {
+			log.Print("error send message to channel ", m.ChannelID, " on guild ", guildID, ": ", err)
+		}
+		return
+	}
+
+	// The command author is joining the working voice channel of bot?
+	userVs, err := discord.VoiceState(s, userID, guildID)
+	if err != nil {
+		log.Printf("failed to get VoiceState of guild %s: %s", guildID, err.Error())
+		return
+	}
+	if userVs == nil {
+		log.Printf("member %s is not joining any voice channel", userID)
+		// Cannot summon me without joining any voice channel
+		if _, err := s.ChannelMessageSend(m.ChannelID, "ボイスチャンネルに参加せずに呼び出すことはできません。"); err != nil {
+			log.Print("error send message to channel ", m.ChannelID, " on guild ", guildID, ": ", err)
+		}
+		return
+	}
+	if userVs.ChannelID != b.voiceChannelID {
+		log.Printf("member %s is not joining voice channel bot is reading %s", botID, b.voiceChannelID)
+		wrkCh, err := s.State.GuildChannel(guildID, b.textChannelID)
+		if err != nil {
+			log.Printf("error find guild %s channel %s", guildID, m.ChannelID)
+			return
+		}
+		msg := fmt.Sprintf("読み上げ中のボイスチャンネル %s に参加せずに読み上げを止めることはできません。", wrkCh.Name)
+		if _, err := s.ChannelMessageSend(m.ChannelID, msg); err != nil {
+			log.Print("error send message to channel ", m.ChannelID, " on guild ", guildID, ": ", err)
+		}
+		return
+	}
+
+	// Ok, then stop worker
+	bindings.Delete(m.GuildID)
 	worker.StopWorker(m.GuildID)
 	if msg := discord.LeaveVC(m.GuildID); msg != "" {
 		if _, err := s.ChannelMessageSend(m.ChannelID, msg); err != nil {
@@ -190,6 +296,17 @@ func helpHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 }
 
 func nonCommandHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
+	bi, ok := bindings.Load(m.GuildID)
+	if !ok {
+		log.Printf("not working on this guild %s. message is ignored", m.GuildID)
+		return
+	}
+	b := bi.(channelBinding)
+	if m.ChannelID != b.textChannelID {
+		log.Printf("bot is working but not reading this text channel%s. message is ignored", m.ChannelID)
+		return
+	}
+
 	lang, err := db.GetUserLanguage(m.Author.ID)
 	if err != nil {
 		log.Print("error get user "+m.Author.ID+"'s langage: ", err)

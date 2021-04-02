@@ -50,14 +50,17 @@ func AddHandler(h interface{}) {
 
 // JoinVC adds the bot to guild
 func JoinVC(s *discordgo.Session, guildID, vcID string) (msg string) {
+	// ok should not be true because use state is also checked in textChannelIDs
 	if conn, ok := dg.VoiceConnections[guildID]; ok {
 		// todo: force move here?
 		if conn.ChannelID == vcID {
 			log.Printf("bot is already joining target voice channel %s guild %s", conn.ChannelID, conn.GuildID)
-			return "もういます。"
+			// Already working. Something is wrong.
+			return "すでにボイスチャンネルにいます。何かがおかしいです。"
 		}
 		log.Printf("bot is already joining other voice channel %s guild %s", conn.ChannelID, conn.GuildID)
-		return "すでに他のボイスチャンネルにいます。" // Already working on other channel
+		// Already working on other channel. Something is wrong.
+		return "すでに他のボイスチャンネルにいます。何かがおかしいです。"
 	}
 
 	if _, err := s.ChannelVoiceJoin(guildID, vcID, false, true); err != nil {
@@ -71,8 +74,10 @@ func JoinVC(s *discordgo.Session, guildID, vcID string) (msg string) {
 // LeaveVC removes the bot from guild
 func LeaveVC(guildID string) (msg string) {
 	conn, ok := dg.VoiceConnections[guildID]
+	// ok should not be false because use state is also checked in textChannelIDs
 	if !ok {
-		return "あなたが参加しているボイスチャンネルにbotがいません" // Bot is not joining your voice channel
+		// Bot is not joining any of this server's voice channel
+		return "このサーバーにbotが参加しているボイスチャンネルがありません。何かがおかしいです。"
 	}
 
 	if err := conn.Disconnect(); err != nil {
