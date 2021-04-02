@@ -28,7 +28,6 @@ func init() {
 
 // Init adds handlers to discord
 func Init() {
-	discord.AddHandler(guildCreate)
 	discord.AddHandler(messageCreate)
 }
 
@@ -56,29 +55,29 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		log.Print("failed to compile mention prefix regexp: ", prefixPatStr)
 	}
 	if prefixPat != nil && prefixPat.MatchString(m.Content) {
-		content := strings.TrimSpace(prefixPat.ReplaceAllString(m.Content, ""))
-		args := strings.Fields(content)
-		head := args[0]
-		tail := args[1:]
+		noMentionContent := strings.TrimSpace(prefixPat.ReplaceAllString(m.Content, ""))
+		if noMentionContent == "" || noMentionContent == "help" {
+			if m.Author.ID == s.State.User.ID {
+				return
+			}
+			helpHandler(s, m)
+			return
+		}
+
+		args := strings.Fields(noMentionContent)
+		var head string
 		if head == "lang" {
 			if m.Author.ID == s.State.User.ID {
 				return
 			}
-			langHandler(s, m, tail)
+			langHandler(s, m, args[1:])
 			return
 		}
 		if head == "rand" {
 			if m.Author.ID == s.State.User.ID {
 				return
 			}
-			randHandler(s, m, tail)
-			return
-		}
-		if head == "help" {
-			if m.Author.ID == s.State.User.ID {
-				return
-			}
-			helpHandler(s, m)
+			randHandler(s, m, args[1:])
 			return
 		}
 		return
@@ -177,7 +176,8 @@ func byeHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 }
 
 func helpHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
-	msg := "https://github.com/tubo28/yomiage/blob/main/README.md"
+	// Usage: ...
+	msg := "使い方: https://github.com/tubo28/yomiage/blob/main/README.md"
 	if _, err := s.ChannelMessageSend(m.ChannelID, msg); err != nil {
 		log.Print("error send message to channel ", m.ChannelID, " on guild ", m.GuildID, ": ", err)
 	}
@@ -244,17 +244,4 @@ func Sanitize(content, lang string, mentions []*discordgo.User) string {
 	s = strings.Join(strings.Fields(s), " ")
 
 	return s
-}
-
-func guildCreate(s *discordgo.Session, event *discordgo.GuildCreate) {
-	if event.Guild.Unavailable {
-		return
-	}
-
-	for _, channel := range event.Guild.Channels {
-		if channel.ID == event.Guild.ID {
-			_, _ = s.ChannelMessageSend(channel.ID, "読み上げくんの準備ができました。 `!hi` で呼び出せます。`!help` で使い方を表示します。")
-			return
-		}
-	}
 }

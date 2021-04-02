@@ -54,10 +54,10 @@ func JoinVC(s *discordgo.Session, guildID, vcID string) (msg string) {
 		// todo: force move here?
 		if conn.ChannelID == vcID {
 			log.Printf("bot is already joining target voice channel %s guild %s", conn.ChannelID, conn.GuildID)
-			return "Already here"
+			return "もういます。"
 		}
 		log.Printf("bot is already joining other voice channel %s guild %s", conn.ChannelID, conn.GuildID)
-		return "すでに他のボイスチャンネルにいます" // Already working on other channel
+		return "すでに他のボイスチャンネルにいます。" // Already working on other channel
 	}
 
 	if _, err := s.ChannelVoiceJoin(guildID, vcID, false, true); err != nil {
@@ -65,7 +65,7 @@ func JoinVC(s *discordgo.Session, guildID, vcID string) (msg string) {
 		return
 	}
 
-	return "読み上げます" // I read text here
+	return "読み上げます。" // I read text here
 }
 
 // LeaveVC removes the bot from guild
