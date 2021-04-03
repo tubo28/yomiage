@@ -105,19 +105,18 @@ func langHandler(s *discordgo.Session, m *discordgo.MessageCreate, args []string
 			return
 		}
 		// User %s's language is %s.
-		msg := fmt.Sprintf("%s の読み上げ言語は %s です。", m.Author.Username, lang)
+		msg := fmt.Sprintf("%s の読み上げ言語は %s です。", nick(s, m.GuildID, m.Author), lang)
 		if _, err := s.ChannelMessageSend(m.ChannelID, msg); err != nil {
 		}
-	} else if args[0] == "set" {
+	} else {
 		// set language
-		args = args[1:]
 		lang := args[0]
 		if err := db.UpsertUserLanguage(m.Author.ID, lang); err != nil {
 			log.Print("error update user ", m.Author.ID, "'s language to ", lang, ": ", err.Error())
 			return
 		}
 		// User %s's language is updated to %s
-		msg := fmt.Sprintf("%s の読み上げ言語を %s に変更しました。", m.Author.Username, lang)
+		msg := fmt.Sprintf("%s の読み上げ言語を %s に変更しました。", nick(s, m.GuildID, m.Author), lang)
 		if _, err := s.ChannelMessageSend(m.ChannelID, msg); err != nil {
 		}
 	}
@@ -133,11 +132,12 @@ func randHandler(s *discordgo.Session, m *discordgo.MessageCreate, args []string
 		return
 	}
 	// Randomized your voice.
-	if _, err := s.ChannelMessageSend(m.ChannelID, m.Author.Username+"の声を変更しました。"); err != nil {
+	if _, err := s.ChannelMessageSend(m.ChannelID, nick(s, m.GuildID, m.Author)+" の声を変更しました。"); err != nil {
 	}
 	var lang string
 	lang, err = db.GetUserLanguage(m.Author.ID)
 	if err != nil {
+		log.Print("error get user "+m.Author.ID+"'s langage: ", err)
 		lang = defaultTTSLang
 	}
 	worker.AddTask(m.GuildID, worker.TTSTask{
@@ -146,6 +146,14 @@ func randHandler(s *discordgo.Session, m *discordgo.MessageCreate, args []string
 		Lang:       lang,
 		VoiceToken: vt,
 	})
+}
+
+func nick(s *discordgo.Session, guildID string, m *discordgo.User) string {
+	if member, err := s.State.Member(guildID, m.ID); err == nil && member.Nick != "" {
+		return member.Nick
+	} else {
+		return m.Username
+	}
 }
 
 type channelBinding struct {
@@ -308,8 +316,6 @@ func nonCommandHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 	lang, err := db.GetUserLanguage(m.Author.ID)
 	if err != nil {
 		log.Print("error get user "+m.Author.ID+"'s langage: ", err)
-	}
-	if lang == "" {
 		lang = defaultTTSLang
 	}
 
