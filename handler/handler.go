@@ -291,6 +291,8 @@ func helpHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 }
 
+const MaxTTSLength = 50
+
 func nonCommandHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 	bi, ok := bindings.Load(m.GuildID)
 	if !ok {
@@ -311,8 +313,12 @@ func nonCommandHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 		lang = defaultTTSLang
 	}
 
+	// TODO: trim ogg files by time
 	text := ReplaceMention(s, m)
 	text = Sanitize(text, lang)
+	if textR := []rune(text); len(textR) > MaxTTSLength {
+		text = string(textR[:MaxTTSLength]) + " 以下略" // following is omitted
+	}
 
 	t := worker.TTSTask{
 		GuildID:    m.GuildID,
