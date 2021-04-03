@@ -10,14 +10,14 @@ Text-to-speech bot for Discord.
 
 Except `!hi`, `!bye` and `<@bot> help` are WIP.
 
-| Command                           |                                                                                                            |
-| --------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `!hi`                             | Summon the bot. The bot will read out the text of the channel where this command was entered.              |
-| `!bye`                            | Stop reading.                                                                                              |
-| `<@bot> help`                     | Show usage.                                                                                                |
-| `<@bot> lang`                     | (WIP) Get the language to read your text.                                                                        |
-| `<@bot> lang set <language code>` | (WIP) Set the language to read your text to `<language code>`. See "language selection" section for the details. |
-| `<@bot> rand`                     | (WIP) Randomize voice to read your text.                                                                         |
+| Command                       |                                                                                                                  |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `!hi`                         | Summon the bot. The bot will read out the text of the channel where this command was entered.                    |
+| `!bye`                        | Stop reading.                                                                                                    |
+| `<@bot> help`                 | Show usage.                                                                                                      |
+| `<@bot> lang`                 | (WIP) Get the language to read your text.                                                                        |
+| `<@bot> lang <language code>` | (WIP) Set the language to read your text to `<language code>`. See "language selection" section for the details. |
+| `<@bot> rand`                 | (WIP) Randomize voice to read your text.                                                                         |
 
 ## Language selection
 
