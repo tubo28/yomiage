@@ -138,6 +138,8 @@ func randHandler(s *discordgo.Session, m *discordgo.MessageCreate, args []string
 	lang, err = db.GetUserLanguage(m.Author.ID)
 	if err != nil {
 		log.Print("error get user "+m.Author.ID+"'s langage: ", err)
+	}
+	if lang == "" {
 		lang = defaultTTSLang
 	}
 	worker.AddTask(m.GuildID, worker.TTSTask{
@@ -151,9 +153,8 @@ func randHandler(s *discordgo.Session, m *discordgo.MessageCreate, args []string
 func nick(s *discordgo.Session, guildID string, m *discordgo.User) string {
 	if member, err := s.State.Member(guildID, m.ID); err == nil && member.Nick != "" {
 		return member.Nick
-	} else {
-		return m.Username
 	}
+	return m.Username
 }
 
 type channelBinding struct {
@@ -299,7 +300,7 @@ func helpHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 }
 
-const MaxTTSLength = 50
+const maxTTSLength = 50
 
 func nonCommandHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 	bi, ok := bindings.Load(m.GuildID)
@@ -316,14 +317,16 @@ func nonCommandHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 	lang, err := db.GetUserLanguage(m.Author.ID)
 	if err != nil {
 		log.Print("error get user "+m.Author.ID+"'s langage: ", err)
+	}
+	if lang == "" {
 		lang = defaultTTSLang
 	}
 
 	// TODO: trim ogg files by time
 	text := replaceMention(s, m)
 	text = Sanitize(text, lang)
-	if textR := []rune(text); len(textR) > MaxTTSLength {
-		text = string(textR[:MaxTTSLength]) + " 以下略" // following is omitted
+	if textR := []rune(text); len(textR) > maxTTSLength {
+		text = string(textR[:maxTTSLength]) + " 以下略" // following is omitted
 	}
 
 	t := worker.TTSTask{
