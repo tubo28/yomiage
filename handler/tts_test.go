@@ -3,15 +3,13 @@ package handler_test
 import (
 	"testing"
 
-	"github.com/bwmarrin/discordgo"
 	"github.com/tubo28/yomiage/handler"
 )
 
 func TestSanitize(t *testing.T) {
 	type args struct {
-		content  string
-		lang     string
-		mentions []*discordgo.User
+		content string
+		lang    string
 	}
 	tests := []struct {
 		name string
@@ -63,23 +61,13 @@ func TestSanitize(t *testing.T) {
 			args: args{
 				content: "a <@!0123> <@4567> b",
 				lang:    "ja-JP",
-				mentions: []*discordgo.User{
-					{
-						ID:       "0123",
-						Username: "abc",
-					},
-					{
-						ID:       "4567",
-						Username: "def",
-					},
-				},
 			},
 			want: "a abc def b",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := handler.Sanitize(tt.args.content, tt.args.lang, tt.args.mentions); got != tt.want {
+			if got := handler.Sanitize(tt.args.content, tt.args.lang); got != tt.want {
 				t.Errorf("Sanitize() = %v, want %v", got, tt.want)
 			}
 		})

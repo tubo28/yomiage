@@ -311,9 +311,12 @@ func nonCommandHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 		lang = defaultTTSLang
 	}
 
+	text := ReplaceMention(s, m)
+	text = Sanitize(text, lang)
+
 	t := worker.TTSTask{
 		GuildID:    m.GuildID,
-		Text:       Sanitize(m.Content, lang, m.Mentions),
+		Text:       text,
 		Lang:       lang,
 		VoiceToken: m.Author.ID, // todo
 	}
@@ -324,15 +327,95 @@ var (
 	urlReg    = xurls.Relaxed
 	ignoreReg = regexp.MustCompile("^[(（)].*[）)]$")
 	kusaReg   = regexp.MustCompile("[wWｗＷ]+$")
+
+	patternChannels = regexp.MustCompile("<#[^>]*>") // <#12345>
 )
+
+// Port of ContentWithMoreMentionsReplaced in DiscordGo
+// https://github.com/bwmarrin/discordgo/blob/cbfa831b6c2dc48e550f89821640c6c7c03e1aa8/message.go#L404
+// Differences:
+// - don't skip non-mentionable role
+// - add emoji replacement
+func ReplaceMention(s *discordgo.Session, m *discordgo.MessageCreate) (content string) {
+	content = m.Content
+
+	if !s.StateEnabled {
+		content = m.ContentWithMentionsReplaced()
+		return
+	}
+
+	channel, err := s.State.Channel(m.ChannelID)
+	if err != nil {
+		content = m.ContentWithMentionsReplaced()
+		return
+	}
+
+	for _, user := range m.Mentions {
+		nick := user.Username
+
+		member, err := s.State.Member(channel.GuildID, user.ID)
+		if err == nil && member.Nick != "" {
+			nick = member.Nick
+		}
+
+		content = strings.NewReplacer(
+			"<@"+user.ID+">", "@"+user.Username,
+			"<@!"+user.ID+">", "@"+nick,
+		).Replace(content)
+	}
+
+	for _, roleID := range m.MentionRoles {
+		role, err := s.State.Role(channel.GuildID, roleID)
+		// modify: don't skip non-mentionable role
+		// continues also if !role.Mentionable in original DiscordGo
+		// but omit it.
+		if err != nil {
+			continue
+		}
+		content = strings.Replace(content, "<@&"+role.ID+">", "@"+role.Name, -1)
+	}
+
+	content = patternChannels.ReplaceAllStringFunc(content, func(mention string) string {
+		channel, err := s.State.Channel(mention[2 : len(mention)-1])
+		if err != nil || channel.Type == discordgo.ChannelTypeGuildVoice {
+			return mention
+		}
+
+		return "#" + channel.Name
+	})
+
+	// modify: add emoji replacement
+	guild, err := s.State.Guild(m.GuildID)
+	if err != nil {
+		return
+	}
+
+	for _, e := range guild.Emojis {
+		// skip if not contains suffix of emoji string for performance
+		// :1234>
+		if !strings.Contains(content, ":"+e.ID+">") {
+			continue
+		}
+
+		ps := "<:[^>:]+:" + e.ID + ">" // <:emoji_name:1234>
+		pattern, err := regexp.Compile(ps)
+		if err != nil {
+			log.Print("failed to compile emoji pattern: ", ps)
+			continue
+		}
+
+		content = pattern.ReplaceAllString(content, ":"+e.Name+":")
+	}
+
+	return
+}
 
 // Sanitize modifies m.Content easier to read for bot in following steps:
 // 1. trim spaces
-// 2. replace mention string to user name
-// 3. replace continuous 'w's to kusa
-// 4. replace URL to "URL"
-// 5. replace continuous whitespaces to single one
-func Sanitize(content, lang string, mentions []*discordgo.User) string {
+// 2. replace continuous 'w's to kusa
+// 3. replace URL to "URL"
+// 4. replace continuous whitespaces to single one
+func Sanitize(content, lang string) string {
 	s := strings.TrimSpace(content)
 
 	// 1
@@ -341,25 +424,14 @@ func Sanitize(content, lang string, mentions []*discordgo.User) string {
 	}
 
 	// 2
-	for _, user := range mentions {
-		mentionPatStr := fmt.Sprintf(`<@!?%s>`, user.ID)
-		mentionPat, err := regexp.Compile(mentionPatStr)
-		if err != nil {
-			log.Printf("failed to compile mention pattern %s to regexp: %s", mentionPat, err)
-			continue
-		}
-		s = mentionPat.ReplaceAllString(s, user.Username)
-	}
-
-	// 3
 	if (strings.HasPrefix(lang, "ja-") || lang == "ja") && kusaReg.MatchString(s) {
 		s = kusaReg.ReplaceAllString(s, " くさ")
 	}
 
-	// 4
+	// 3
 	s = urlReg.ReplaceAllString(s, " URL ")
 
-	// 5
+	// 4
 	s = strings.Join(strings.Fields(s), " ")
 
 	return s
