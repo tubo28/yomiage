@@ -314,7 +314,7 @@ func nonCommandHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 
 	// TODO: trim ogg files by time
-	text := ReplaceMention(s, m)
+	text := replaceMention(s, m)
 	text = Sanitize(text, lang)
 	if textR := []rune(text); len(textR) > MaxTTSLength {
 		text = string(textR[:MaxTTSLength]) + " 以下略" // following is omitted
@@ -342,7 +342,7 @@ var (
 // Differences:
 // - don't skip non-mentionable role
 // - add emoji replacement
-func ReplaceMention(s *discordgo.Session, m *discordgo.MessageCreate) (content string) {
+func replaceMention(s *discordgo.Session, m *discordgo.MessageCreate) (content string) {
 	content = m.Content
 
 	if !s.StateEnabled {
