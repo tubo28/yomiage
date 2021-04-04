@@ -11,7 +11,6 @@ import (
 	"github.com/tubo28/yomiage/discord"
 	"github.com/tubo28/yomiage/handler"
 	"github.com/tubo28/yomiage/tts"
-	"github.com/tubo28/yomiage/worker"
 )
 
 func main() {
@@ -25,8 +24,6 @@ func main() {
 	defer discord.Close()
 
 	handler.Init()
-
-	go worker.CleanerWorker()
 
 	// Wait here until CTRL-C or other term signal is received.
 	fmt.Println("yomiage is now running. press CTRL-C to exit.")

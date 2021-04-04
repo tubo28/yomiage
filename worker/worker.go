@@ -30,35 +30,38 @@ func NewConsumer(ID string) *Consumer {
 	}
 }
 
-func (c *Consumer) Start(ctx context.Context, wg *sync.WaitGroup) {
-L:
-	for {
-		select {
-		case <-ctx.Done():
-			break L
-		default:
+func (c *Consumer) StartAsync(ctx context.Context, wg *sync.WaitGroup) {
+	wg.Add(1)
+	go func() {
+	L:
+		for {
+			select {
+			case <-ctx.Done():
+				break L
+			default:
+			}
+
+			task, ok := <-c.queue
+			if !ok {
+				log.Printf("task queue of consumer %s is closed", c.ID)
+				break L
+			}
+			log.Print("<-- task received: ", task.ID)
+			if err := task.Do(); err != nil {
+				log.Print("error occurs: ", err)
+			}
+			log.Print("task finished: ", task.ID)
 		}
 
-		task, ok := <-c.queue
-		if !ok {
-			log.Printf("task queue of consumer %s is closed", c.ID)
-			break L
+		log.Printf("stop consumer %s. %d tasks remains", c.ID, len(c.queue))
+		close(c.queue)
+		for task := range c.queue {
+			log.Printf("task %s is discarded. consumer will be killed", task.ID)
 		}
-		log.Print("<-- task received: ", task.ID)
-		if err := task.Do(); err != nil {
-			log.Print("error occurs: ", err)
-		}
-		log.Print("task finished: ", task.ID)
-	}
 
-	log.Printf("stop consumer %s. %d tasks remains", c.ID, len(c.queue))
-	close(c.queue)
-	for task := range c.queue {
-		log.Printf("task %s is discarded. consumer will be killed", task.ID)
-	}
-
-	log.Printf("consume %s is killed", c.ID)
-	wg.Done()
+		log.Printf("consume %s is killed", c.ID)
+		wg.Done()
+	}()
 }
 
 func (c *Consumer) Add(t Task) {

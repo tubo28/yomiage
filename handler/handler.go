@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -30,6 +31,7 @@ func init() {
 // Init adds handlers to discord
 func Init() {
 	discord.AddHandler(messageCreate)
+	go CleanerWorkerEndless()
 }
 
 func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
@@ -80,14 +82,13 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			langHandler(s, m, args)
 			return
 		}
-		// todo
-		// if head == "rand" {
-		// 	if m.Author.ID == s.State.User.ID {
-		// 		return
-		// 	}
-		// 	randHandler(s, m, args)
-		// 	return
-		// }
+		if head == "rand" {
+			if m.Author.ID == s.State.User.ID {
+				return
+			}
+			randHandler(s, m, args)
+			return
+		}
 		return
 	}
 
@@ -131,9 +132,12 @@ func randHandler(s *discordgo.Session, m *discordgo.MessageCreate, args []string
 		log.Print("error update user voice token ", m.Author.ID, "'s token: ", err.Error())
 		return
 	}
-	// Randomized your voice.
+
+	// update voice token
 	if _, err := s.ChannelMessageSend(m.ChannelID, nick(s, m.GuildID, m.Author)+" の声を変更しました。"); err != nil {
 	}
+
+	// play sample voice
 	var lang string
 	lang, err = db.GetUserLanguage(m.Author.ID)
 	if err != nil {
@@ -142,12 +146,21 @@ func randHandler(s *discordgo.Session, m *discordgo.MessageCreate, args []string
 	if lang == "" {
 		lang = defaultTTSLang
 	}
-	worker.AddTask(m.GuildID, worker.TTSTask{
-		GuildID:    m.GuildID,
-		Text:       "サンプル、イカよろしく～", // This is test
-		Lang:       lang,
-		VoiceToken: vt,
-	})
+
+	ci, ok := consumers.Load(m.GuildID)
+	if ok {
+		c := ci.(*ttsConsumerBinding)
+		// Sample: hello
+		text := "サンプル: イカよろしく～"
+		c.consumer.Add(worker.Task{
+			ID: fmt.Sprintf("Read %s in guild %s", text, m.GuildID),
+			Do: func() error {
+				err := discord.Play(text, lang, vt, m.GuildID)
+				time.Sleep(100 * time.Millisecond)
+				return err
+			},
+		})
+	}
 }
 
 func nick(s *discordgo.Session, guildID string, m *discordgo.User) string {
@@ -157,22 +170,26 @@ func nick(s *discordgo.Session, guildID string, m *discordgo.User) string {
 	return m.Username
 }
 
-type channelBinding struct {
-	voiceChannelID string
-	textChannelID  string
+type ttsConsumerBinding struct {
+	guildID        string
+	voiceChannelID string // VC to send voice
+	textChannelID  string // TC to read
+	consumer       *worker.Consumer
+	Cancel         func() // func to stop consumer
 }
 
-// maps guildID to channelBinding to read
+// maps guildID to ttsConsumerBinding to read
 // also works as flag whether the bot is working on a guild
-var bindings sync.Map
+var consumers sync.Map
 
 func hiHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 	authorID := m.Author.ID
 	guildID := m.GuildID
 
 	// Bot is not working on this guild?
-	if cid, ok := bindings.Load(guildID); ok {
-		log.Printf("bot is already joining voice channel %s this guild %s", cid, m.GuildID)
+	if ci, ok := consumers.Load(guildID); ok {
+		c := ci.(*ttsConsumerBinding)
+		log.Printf("bot is already joining voice channel %s of this guild %s", c.voiceChannelID, m.GuildID)
 		ch, err := s.State.GuildChannel(guildID, m.ChannelID)
 		if err != nil {
 			log.Printf("error find guild %s channel %s", guildID, m.ChannelID)
@@ -202,12 +219,19 @@ func hiHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 
 	// Ok, then start worker
-	bindings.Store(guildID, channelBinding{
+	ctx, cancel := context.WithCancel(context.Background())
+	wg := new(sync.WaitGroup) // now wg is not used. we can deleted it
+	consumer := worker.NewConsumer(guildID)
+	consumers.Store(guildID, &ttsConsumerBinding{
+		guildID:        m.GuildID,
 		voiceChannelID: userVs.ChannelID,
 		textChannelID:  m.ChannelID,
+		consumer:       consumer, // consumer should have cancel and wg should?
+		Cancel:         cancel,
 	})
 
-	worker.StartWorker(guildID)
+	consumer.StartAsync(ctx, wg)
+
 	time.Sleep(200 * time.Millisecond) // waiting for bot to join voice channel
 	if msg := discord.JoinVC(s, m.GuildID, userVs.ChannelID); msg != "" {
 		if _, err := s.ChannelMessageSend(m.ChannelID, msg); err != nil {
@@ -222,7 +246,7 @@ func byeHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 	guildID := m.GuildID
 
 	// Bot is working on this guild?
-	bi, ok := bindings.Load(guildID)
+	ci, ok := consumers.Load(guildID)
 	if !ok {
 		log.Print("not working on this guild ", guildID)
 		// Not working on this guild
@@ -232,17 +256,17 @@ func byeHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 		return
 	}
 
-	b := bi.(channelBinding)
+	c := ci.(*ttsConsumerBinding)
 
 	// Text channel on which the commend was post is the working text channel of bot?
-	if m.ChannelID != b.textChannelID {
-		log.Printf("member %s is not joining voice channel bot is reading %s", userID, b.voiceChannelID)
+	if m.ChannelID != c.textChannelID {
+		log.Printf("member %s is not joining voice channel bot is reading %s", userID, c.voiceChannelID)
 		thisCh, err := s.State.GuildChannel(guildID, m.ChannelID)
 		if err != nil {
 			log.Printf("error find guild %s channel %s", guildID, m.ChannelID)
 			return
 		}
-		wrkCh, err := s.State.GuildChannel(guildID, b.textChannelID)
+		wrkCh, err := s.State.GuildChannel(guildID, c.textChannelID)
 		if err != nil {
 			log.Printf("error find guild %s channel %s", guildID, m.ChannelID)
 			return
@@ -268,9 +292,9 @@ func byeHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 		}
 		return
 	}
-	if userVs.ChannelID != b.voiceChannelID {
-		log.Printf("member %s is not joining voice channel bot is reading %s", botID, b.voiceChannelID)
-		wrkCh, err := s.State.GuildChannel(guildID, b.textChannelID)
+	if userVs.ChannelID != c.voiceChannelID {
+		log.Printf("member %s is not joining voice channel bot is reading %s", botID, c.voiceChannelID)
+		wrkCh, err := s.State.GuildChannel(guildID, c.textChannelID)
 		if err != nil {
 			log.Printf("error find guild %s channel %s", guildID, m.ChannelID)
 			return
@@ -283,8 +307,8 @@ func byeHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 
 	// Ok, then stop worker
-	bindings.Delete(m.GuildID)
-	worker.StopWorker(m.GuildID)
+	consumers.Delete(m.GuildID)
+	c.Cancel()
 	if msg := discord.LeaveVC(m.GuildID); msg != "" {
 		if _, err := s.ChannelMessageSend(m.ChannelID, msg); err != nil {
 			log.Print("error send message to channel ", m.ChannelID, " on guild ", m.GuildID, ": ", err)
@@ -303,13 +327,13 @@ func helpHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 const maxTTSLength = 50
 
 func nonCommandHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
-	bi, ok := bindings.Load(m.GuildID)
+	ci, ok := consumers.Load(m.GuildID)
 	if !ok {
 		log.Printf("not working on this guild %s. message is ignored", m.GuildID)
 		return
 	}
-	b := bi.(channelBinding)
-	if m.ChannelID != b.textChannelID {
+	c := ci.(*ttsConsumerBinding)
+	if m.ChannelID != c.textChannelID {
 		log.Printf("bot is working but not reading this text channel%s. message is ignored", m.ChannelID)
 		return
 	}
@@ -322,6 +346,14 @@ func nonCommandHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 		lang = defaultTTSLang
 	}
 
+	vt, err := db.GetUserVoiceToken(m.Author.ID)
+	if err != nil {
+		log.Print("error get user "+m.Author.ID+"'s voice token: ", err)
+	}
+	if vt == "" {
+		vt = m.Author.ID
+	}
+
 	// TODO: trim ogg files by time
 	text := replaceMention(s, m)
 	text = Sanitize(text, lang)
@@ -329,13 +361,14 @@ func nonCommandHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 		text = string(textR[:maxTTSLength]) + " 以下略" // following is omitted
 	}
 
-	t := worker.TTSTask{
-		GuildID:    m.GuildID,
-		Text:       text,
-		Lang:       lang,
-		VoiceToken: m.Author.ID, // todo
-	}
-	worker.AddTask(m.GuildID, t)
+	c.consumer.Add(worker.Task{
+		ID: fmt.Sprintf("Read %s in guild %s", text, m.GuildID),
+		Do: func() error {
+			err := discord.Play(text, lang, vt, m.GuildID)
+			time.Sleep(100 * time.Millisecond)
+			return err
+		},
+	})
 }
 
 var (
@@ -367,6 +400,9 @@ func replaceMention(s *discordgo.Session, m *discordgo.MessageCreate) (content s
 
 	for _, user := range m.Mentions {
 		nick := user.Username
+
+		println(user.ID)
+		println(nick)
 
 		member, err := s.State.Member(channel.GuildID, user.ID)
 		if err == nil && member.Nick != "" {
@@ -450,4 +486,39 @@ func Sanitize(content, lang string) string {
 	s = strings.Join(strings.Fields(s), " ")
 
 	return s
+}
+
+// CleanerWorker starts worker which clean up workers which is alone on voice channels
+func CleanerWorker() {
+	log.Print("start cleaner worker")
+	for {
+		time.Sleep(10 * time.Second)
+		cs := []*ttsConsumerBinding{}
+		consumers.Range(func(k interface{}, v interface{}) bool {
+			cs = append(cs, v.(*ttsConsumerBinding))
+			return true
+		})
+		for _, c := range cs {
+			time.Sleep(1 * time.Second)
+			if discord.Alone(c.guildID) {
+				log.Printf("bot is alone in voice channel on guild %s, leave", c.guildID)
+				c.Cancel()
+				_ = discord.LeaveVC(c.guildID)
+			}
+		}
+	}
+}
+
+// CleanerWorkerEndless calls CleanerWorker and call it again if it panics
+func CleanerWorkerEndless() {
+	for {
+		func() {
+			defer func() {
+				if err := recover(); err != nil {
+					log.Println("CleanerWorker paniced unexpectedly: ", err)
+				}
+			}()
+			CleanerWorker()
+		}()
+	}
 }
