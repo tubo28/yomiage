@@ -502,6 +502,7 @@ func CleanerWorker() {
 			time.Sleep(1 * time.Second)
 			if discord.Alone(c.guildID) {
 				log.Printf("bot is alone in voice channel on guild %s, leave", c.guildID)
+				consumers.Delete(c.guildID)
 				c.Cancel()
 				_ = discord.LeaveVC(c.guildID)
 			}
