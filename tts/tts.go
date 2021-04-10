@@ -38,11 +38,7 @@ func Close() {
 func hash(s string) int64 {
 	h := fnv.New64()
 	h.Write([]byte(s))
-	x := h.Sum64() / 2
-	if x < 0 {
-		x = -x
-	}
-	return int64(x)
+	return int64(h.Sum64() / 2)
 }
 
 func ttsReq(text, lang, voiceToken string) *gtts_pb.SynthesizeSpeechRequest {
