@@ -31,7 +31,7 @@ func init() {
 // Init adds handlers to discord
 func Init() {
 	discord.AddHandler(messageCreate)
-	go CleanerWorkerEndless()
+	go cleanerWorkerEndless()
 }
 
 func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
@@ -152,14 +152,13 @@ func randHandler(s *discordgo.Session, m *discordgo.MessageCreate, args []string
 		c := ci.(*ttsConsumerBinding)
 		// Sample: hello
 		text := "サンプル: イカよろしく～"
-		c.consumer.Add(worker.Task{
-			ID: fmt.Sprintf("Read %s in guild %s", text, m.GuildID),
-			Do: func() error {
+		c.consumer.Add(*worker.NewTask(fmt.Sprintf("Read %s in guild %s", text, m.GuildID),
+			func() error {
 				err := discord.Play(text, lang, vt, m.GuildID)
 				time.Sleep(100 * time.Millisecond)
 				return err
 			},
-		})
+		))
 	}
 }
 
@@ -361,14 +360,13 @@ func nonCommandHandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 		text = string(textR[:maxTTSLength]) + " 以下略" // following is omitted
 	}
 
-	c.consumer.Add(worker.Task{
-		ID: fmt.Sprintf("Read %s in guild %s", text, m.GuildID),
-		Do: func() error {
+	c.consumer.Add(*worker.NewTask(fmt.Sprintf("Read %s in guild %s", text, m.GuildID),
+		func() error {
 			err := discord.Play(text, lang, vt, m.GuildID)
 			time.Sleep(100 * time.Millisecond)
 			return err
 		},
-	})
+	))
 }
 
 var (
@@ -488,8 +486,8 @@ func Sanitize(content, lang string) string {
 	return s
 }
 
-// CleanerWorker starts worker which clean up workers which is alone on voice channels
-func CleanerWorker() {
+// cleanerWorker starts worker which clean up workers which is alone on voice channels
+func cleanerWorker() {
 	log.Print("start cleaner worker")
 	for {
 		time.Sleep(10 * time.Second)
@@ -510,8 +508,8 @@ func CleanerWorker() {
 	}
 }
 
-// CleanerWorkerEndless calls CleanerWorker and call it again if it panics
-func CleanerWorkerEndless() {
+// cleanerWorkerEndless calls CleanerWorker and call it again if it panics
+func cleanerWorkerEndless() {
 	for {
 		func() {
 			defer func() {
@@ -519,7 +517,7 @@ func CleanerWorkerEndless() {
 					log.Println("CleanerWorker paniced unexpectedly: ", err)
 				}
 			}()
-			CleanerWorker()
+			cleanerWorker()
 		}()
 	}
 }

@@ -148,7 +148,7 @@ func Alone(guildID string) bool {
 		}
 	}
 	if vcID == "" {
-		log.Print("error voice chat joining bot not found")
+		log.Print("error voice channel bot is joining not found")
 		return true
 	}
 	count := 0
